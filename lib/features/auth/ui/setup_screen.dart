@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/security/vault_bootstrap_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
-import 'vault_list_screen.dart';
+import '../../vault/ui/vault_list_screen.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
