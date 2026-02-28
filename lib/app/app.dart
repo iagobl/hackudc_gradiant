@@ -25,13 +25,29 @@ class _BootDecider extends StatefulWidget {
   State<_BootDecider> createState() => _BootDeciderState();
 }
 
-class _BootDeciderState extends State<_BootDecider> {
+class _BootDeciderState extends State<_BootDecider> with WidgetsBindingObserver {
   late final VaultBootstrapService _bootstrap;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _bootstrap = VaultBootstrapService(SecureStorageService());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _bootstrap.lockVault();
+    }
   }
 
   @override
