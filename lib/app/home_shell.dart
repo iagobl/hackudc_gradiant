@@ -42,6 +42,10 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icon(Icons.password),
             label: 'Generador',
           ),
+          NavigationDestination(
+            icon: Icon(Icons.settings),
+            label: 'Configuración',
+          ),
         ],
       ),
     );
