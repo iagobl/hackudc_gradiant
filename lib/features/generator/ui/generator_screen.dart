@@ -1,6 +1,6 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/security/crypto_service.dart';
 
 class GeneratorScreen extends StatefulWidget {
   const GeneratorScreen({super.key});
@@ -10,7 +10,7 @@ class GeneratorScreen extends StatefulWidget {
 }
 
 class _GeneratorScreenState extends State<GeneratorScreen> {
-  final _rng = Random.secure();
+  final _crypto = CryptoService();
 
   int _length = 16;
   bool _lower = true;
@@ -59,7 +59,8 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
       for (int i = 0; i < count; i++) {
         if (filtered.isNotEmpty) {
-          chars.add(filtered[_rng.nextInt(filtered.length)]);
+          // Usamos el nuevo nextInt con entropía mezclada
+          chars.add(filtered[_crypto.nextInt(filtered.length)]);
         }
       }
     }
@@ -68,10 +69,17 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
     if (_symbols) addFrom(_symbolChars, _minSymbols);
 
     while (chars.length < length) {
-      chars.add(alphabet[_rng.nextInt(alphabet.length)]);
+      chars.add(alphabet[_crypto.nextInt(alphabet.length)]);
     }
 
-    chars.shuffle(_rng);
+    // Barajado final (Shuffle) usando también entropía endurecida
+    for (int i = chars.length - 1; i > 0; i--) {
+      int j = _crypto.nextInt(i + 1);
+      var temp = chars[i];
+      chars[i] = chars[j];
+      chars[j] = temp;
+    }
+
     return chars.join();
   }
 
@@ -120,8 +128,8 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
-                      'Genera una contraseña segura en un toque.',
-                      style: TextStyle(fontSize: 16),
+                      'Generador endurecido con entropía acumulativa (SO + Tiempo + Hash).',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                     const SizedBox(height: 16),
 
@@ -136,7 +144,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                           Expanded(
                             child: SelectableText(
                               _generated.isEmpty ? 'Pulsa "Generar"' : _generated,
-                              style: const TextStyle(fontSize: 16),
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2),
                             ),
                           ),
                           IconButton(
@@ -153,10 +161,13 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: LinearProgressIndicator(value: score / 100),
+                          child: LinearProgressIndicator(
+                            value: score / 100,
+                            color: score < 40 ? Colors.red : (score < 70 ? Colors.orange : Colors.green),
+                          ),
                         ),
                         const SizedBox(width: 12),
-                        Text(_strengthLabel(score)),
+                        Text(_strengthLabel(score), style: const TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
 
@@ -169,8 +180,8 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                     Slider(
                       value: _length.toDouble(),
                       min: 8,
-                      max: 32,
-                      divisions: 24,
+                      max: 64, // Aumentado a 64 para máxima seguridad
+                      divisions: 56,
                       label: '$_length',
                       onChanged: (v) => setState(() => _length = v.round()),
                     ),
