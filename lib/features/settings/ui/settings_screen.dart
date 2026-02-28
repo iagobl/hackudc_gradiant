@@ -17,7 +17,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   
   bool _biometricsEnabled = false;
   bool _loading = true;
-  int _autoLockSeconds = 0; // 0 significa bloqueo inmediato
+  int _autoLockSeconds = 30;
 
   static const _kAutoLockKey = 'settings_auto_lock_seconds';
 

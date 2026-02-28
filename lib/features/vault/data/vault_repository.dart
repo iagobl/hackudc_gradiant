@@ -46,6 +46,42 @@ class VaultRepository {
     );
   }
 
+  Future<void> updateEntry({
+    required int id,
+    required String title,
+    required String username,
+    String? password,
+    String? url,
+    SecretKey? dek,
+  }) async {
+    final companion = VaultEntriesCompanion(
+      id: Value(id),
+      title: Value(title),
+      username: Value(username),
+      url: Value(url),
+      updatedAt: Value(DateTime.now()),
+    );
+
+    if (password != null && dek != null) {
+      final plain = Uint8List.fromList(utf8.encode(password));
+      final enc = await _crypto.encrypt(plain: plain, key: dek);
+      
+      await (_db.update(_db.vaultEntries)..where((t) => t.id.equals(id))).write(
+        companion.copyWith(
+          passwordCipher: Value(Uint8List.fromList(enc.cipherText)),
+          passwordNonce: Value(Uint8List.fromList(enc.nonce)),
+          passwordMac: Value(Uint8List.fromList(enc.mac.bytes)),
+        ),
+      );
+    } else {
+      await (_db.update(_db.vaultEntries)..where((t) => t.id.equals(id))).write(companion);
+    }
+  }
+
+  Future<void> deleteEntry(int id) async {
+    await (_db.delete(_db.vaultEntries)..where((t) => t.id.equals(id))).go();
+  }
+
   Future<String> decryptPassword(int entryId, SecretKey dek) async {
     final row = await (_db.select(_db.vaultEntries)
       ..where((t) => t.id.equals(entryId)))
@@ -59,6 +95,15 @@ class VaultRepository {
 
     final plainBytes = await _crypto.decrypt(box: box, key: dek);
     return utf8.decode(plainBytes);
+  }
+
+  Future<void> updateRequireMasterPassword(int entryId, bool required) async {
+    await (_db.update(_db.vaultEntries)..where((t) => t.id.equals(entryId))).write(
+      VaultEntriesCompanion(
+        requireMasterPassword: Value(required),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   Future<void> setPwnedResult({
@@ -79,5 +124,9 @@ class VaultRepository {
     return (_db.select(_db.vaultEntries)
       ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
         .watch();
+  }
+
+  Stream<VaultEntry> watchEntry(int id) {
+    return (_db.select(_db.vaultEntries)..where((t) => t.id.equals(id))).watchSingle();
   }
 }
