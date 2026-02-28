@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hackudc_gradiant/features/generator/ui/generator_screen.dart';
+import 'package:hackudc_gradiant/features/settings/ui/settings_screen.dart';
 import '../features/vault/ui/vault_list_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -28,6 +29,7 @@ class _HomeShellState extends State<HomeShell> {
         children: const [
           VaultListScreen(),
           GeneratorScreen(),
+          SettingsScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
