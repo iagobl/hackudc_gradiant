@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../core/security/vault_bootstrap_service.dart';
-import '../../../core/storage/secure_storage_service.dart';
+
 import '../../../app/home_shell.dart';
+import '../data/lock_controller.dart';
 
 class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
@@ -15,12 +15,20 @@ class _LockScreenState extends State<LockScreen> {
 
   final _pw = TextEditingController();
 
-  bool _busy = false;
   bool _obscure = true;
-  String? _error;
 
-  late final VaultBootstrapService _service =
-  VaultBootstrapService(SecureStorageService());
+  late final LockController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = LockController();
+    _c.addListener(_onChanged);
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
+  }
 
   Future<void> _showCenterMessage({
     required String title,
@@ -43,57 +51,29 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   Future<void> _tryBiometric() async {
-    setState(() {
-      _error = null;
-      _busy = true;
-    });
+    final ok = await _c.tryBiometric();
+    if (!ok) return;
 
-    try {
-      final service = VaultBootstrapService(SecureStorageService());
-
-      await service.unlockVaultWithBiometrics();
-
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeShell(initialIndex: 0)),
-      );
-    } on StateError catch (e) {
-      setState(() => _error =
-      '${e.message}. Desbloquea una vez con la clave maestra para activarla.');
-    } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const HomeShell(initialIndex: 0)),
+    );
   }
 
   Future<void> _unlockWithMaster() async {
-    setState(() {
-      _error = null;
-      _busy = true;
-    });
+    final ok = await _c.unlockWithMaster(_pw.text);
+    if (!ok) return;
 
-    try {
-      final master = _pw.text;
-      if (master.isEmpty) {
-        throw Exception('Introduce tu clave maestra.');
-      }
-
-      await _service.unlockVault(masterPassword: master);
-
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeShell(initialIndex: 0)),
-      );
-    } catch (_) {
-      setState(() => _error = 'Clave incorrecta o vault dañado.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const HomeShell(initialIndex: 0)),
+    );
   }
 
   @override
   void dispose() {
+    _c.removeListener(_onChanged);
+    _c.dispose();
     _pw.dispose();
     super.dispose();
   }
@@ -272,8 +252,8 @@ class _LockScreenState extends State<LockScreen> {
                               ),
                             ),
                             OutlinedButton(
-                              onPressed: _busy ? null : _tryBiometric,
-                              child: _busy
+                              onPressed: _c.busy ? null : _tryBiometric,
+                              child: _c.busy
                                   ? const SizedBox(
                                 width: 18,
                                 height: 18,
@@ -303,23 +283,24 @@ class _LockScreenState extends State<LockScreen> {
                               controller: _pw,
                               obscureText: _obscure,
                               textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _busy ? null : _unlockWithMaster(),
+                              onSubmitted: (_) => _c.busy ? null : _unlockWithMaster(),
                               decoration: _dec(
                                 context,
                                 label: 'Introduce tu clave maestra',
                                 suffix: IconButton(
-                                  onPressed:
-                                  _busy ? null : () => setState(() => _obscure = !_obscure),
+                                  onPressed: _c.busy
+                                      ? null
+                                      : () => setState(() => _obscure = !_obscure),
                                   icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
                                 ),
                               ),
                             ),
                             const SizedBox(height: 10),
-                            if (_error != null)
+                            if (_c.error != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 2),
                                 child: Text(
-                                  _error!,
+                                  _c.error!,
                                   style: TextStyle(
                                     color: cs.error,
                                     fontWeight: FontWeight.w600,
@@ -339,8 +320,8 @@ class _LockScreenState extends State<LockScreen> {
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _busy ? null : _unlockWithMaster,
-                    child: _busy
+                    onPressed: _c.busy ? null : _unlockWithMaster,
+                    child: _c.busy
                         ? const SizedBox(
                       width: 22,
                       height: 22,
