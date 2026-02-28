@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../core/security/vault_state.dart';
+
+import '../data/vault_add_controller.dart';
 import '../data/vault_repository.dart';
-import '../../../core/security/pwned_passwords_service.dart';
 
 class VaultAddScreen extends StatefulWidget {
   const VaultAddScreen({super.key, required this.repo});
@@ -25,14 +25,20 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
   final _urlFocus = FocusNode();
   final _passFocus = FocusNode();
 
-  bool _busy = false;
   bool _obscure = true;
-  bool _requireMasterPassword = false;
 
-  bool _checking = false;
-  int? _pwnedCount;
+  late final VaultAddController _c;
 
-  late final PwnedPasswordsService _pwned = PwnedPasswordsService();
+  @override
+  void initState() {
+    super.initState();
+    _c = VaultAddController(repo: widget.repo);
+    _c.addListener(_onChanged);
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
+  }
 
   Future<void> _showCenterMessage({
     required String title,
@@ -56,11 +62,11 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
   }
 
   Future<void> _checkPwned() async {
-    if (_busy || _checking) return;
+    if (_c.busy || _c.checking) return;
 
-    setState(() => _checking = true);
     try {
       final pw = _pass.text;
+
       if (pw.isEmpty) {
         await _showCenterMessage(
           title: 'Falta la contraseña',
@@ -70,10 +76,8 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
         return;
       }
 
-      final count = await _pwned.getPwnCount(pw);
-      if (!mounted) return;
-
-      setState(() => _pwnedCount = count);
+      final count = await _c.checkPwned(pw);
+      if (count == null) return;
 
       await _showCenterMessage(
         title: count > 0 ? 'Contraseña comprometida' : 'Contraseña no encontrada',
@@ -88,36 +92,18 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
         message: e.toString().replaceFirst('Exception: ', ''),
         isError: true,
       );
-    } finally {
-      if (mounted) setState(() => _checking = false);
     }
   }
 
   Future<void> _save() async {
-    if (_busy) return;
+    if (_c.busy) return;
 
-    setState(() => _busy = true);
     try {
-      final title = _title.text.trim();
-      final user = _user.text.trim();
-      final pw = _pass.text;
-      final url = _url.text.trim().isEmpty ? null : _url.text.trim();
-
-      if (title.isEmpty) throw Exception('Introduce un nombre (ej: Google).');
-      if (user.isEmpty) throw Exception('Introduce el usuario/email.');
-      if (pw.isEmpty) throw Exception('Introduce la contraseña.');
-
-      final dek = VaultState.instance?.dek;
-      if (dek == null) throw Exception('Vault bloqueado.');
-
-      await widget.repo.addEntry(
-        title: title,
-        username: user,
-        password: pw,
-        url: url,
-        pwnedCount: _pwnedCount,
-        dek: dek,
-        requireMasterPassword: _requireMasterPassword,
+      await _c.save(
+        title: _title.text,
+        username: _user.text,
+        password: _pass.text,
+        url: _url.text,
       );
 
       if (!mounted) return;
@@ -128,8 +114,6 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
         message: e.toString().replaceFirst('Exception: ', ''),
         isError: true,
       );
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -143,6 +127,10 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
     _userFocus.dispose();
     _urlFocus.dispose();
     _passFocus.dispose();
+
+    _c.removeListener(_onChanged);
+    _c.disposeController();
+    _c.dispose();
     super.dispose();
   }
 
@@ -262,9 +250,7 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 14),
-
                       _block(
                         context,
                         child: Column(
@@ -290,19 +276,17 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
                                 context,
                                 label: 'Contraseña',
                                 suffix: IconButton(
-                                  onPressed: _busy ? null : () => setState(() => _obscure = !_obscure),
+                                  onPressed: _c.busy ? null : () => setState(() => _obscure = !_obscure),
                                   icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
                                 ),
                               ),
                             ),
-
                             const SizedBox(height: 14),
-
                             Align(
                               alignment: Alignment.center,
                               child: OutlinedButton.icon(
-                                onPressed: _busy || _checking ? null : _checkPwned,
-                                icon: _checking
+                                onPressed: _c.busy || _c.checking ? null : _checkPwned,
+                                icon: _c.checking
                                     ? const SizedBox(
                                   width: 18,
                                   height: 18,
@@ -318,9 +302,7 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 14),
-
                       Container(
                         decoration: BoxDecoration(
                           color: cs.surface,
@@ -332,24 +314,22 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
                           subtitle: const Text(
                             'Se pedirá la contraseña cada vez que intentes revelar esta contraseña',
                           ),
-                          value: _requireMasterPassword,
-                          onChanged: (v) => setState(() => _requireMasterPassword = v),
+                          value: _c.requireMasterPassword,
+                          onChanged: (v) => _c.setRequireMasterPassword(v),
                         ),
                       ),
-
                       const SizedBox(height: 24),
                     ],
                   ),
                 ),
               ),
-
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _busy ? null : _save,
-                    child: _busy
+                    onPressed: _c.busy ? null : _save,
+                    child: _c.busy
                         ? const SizedBox(
                       width: 22,
                       height: 22,

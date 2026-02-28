@@ -30,7 +30,6 @@ class VaultEntries extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
-  // ✅ Instancia única (Singleton) para asegurar que toda la app comparta la misma reactividad
   static final AppDatabase instance = AppDatabase();
 
   @override
