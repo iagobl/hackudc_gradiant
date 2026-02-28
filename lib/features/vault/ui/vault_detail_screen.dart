@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/storage/app_database.dart'; // ✅ VaultEntry
+import '../../../core/storage/app_database.dart';
 import '../../../core/security/vault_state.dart';
 import '../../../core/security/vault_bootstrap_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
@@ -65,6 +65,7 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
     _urlController.dispose();
     _passController.dispose();
     _clipboardTimer?.cancel();
+    _pwned.dispose();
     super.dispose();
   }
 
@@ -72,7 +73,7 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
     final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest, // gris suave exterior
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: cs.outlineVariant.withOpacity(0.28)),
       ),
@@ -91,35 +92,6 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
       ),
       padding: const EdgeInsets.all(14),
       child: child,
-    );
-  }
-
-  InputDecoration _fieldDecoration(
-      BuildContext context, {
-        required String label,
-        Widget? suffix,
-        String? helperText,
-      }) {
-    final cs = Theme.of(context).colorScheme;
-
-    return InputDecoration(
-      labelText: label,
-      helperText: helperText,
-      filled: true,
-      fillColor: cs.surface,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.55)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.45)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _accentBlue, width: 1.6),
-      ),
-      suffixIcon: suffix,
     );
   }
 
@@ -241,7 +213,6 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
 
   Future<bool> _authenticateWithMasterPassword() async {
     final passwordController = TextEditingController();
-
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
@@ -676,8 +647,18 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                             ),
                             Switch(
                               value: e.requireMasterPassword,
-                              onChanged: (val) =>
-                                  widget.repo.updateRequireMasterPassword(e.id, val),
+                              onChanged: (val) async {
+                                // ✅ Pedir Clave Maestra SOLO para desactivar (pasar de Sí a No)
+                                if (val == false) {
+                                  final authenticated = await _authenticateWithMasterPassword();
+                                  if (authenticated) {
+                                    widget.repo.updateRequireMasterPassword(e.id, false);
+                                  }
+                                } else {
+                                  // Activar no requiere validación (es aumentar seguridad)
+                                  widget.repo.updateRequireMasterPassword(e.id, true);
+                                }
+                              },
                             ),
                           ],
                         ),
