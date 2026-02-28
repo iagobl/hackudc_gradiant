@@ -54,8 +54,7 @@ class VaultListController extends ChangeNotifier {
     if (q.isNotEmpty) {
       filtered = _raw.where((e) {
         final t = e.title.toLowerCase();
-        final u = (e.username ?? '').toLowerCase();
-        return t.contains(q) || u.contains(q);
+        return t.startsWith(q);
       }).toList();
     } else {
       filtered = List<VaultEntry>.from(_raw);
