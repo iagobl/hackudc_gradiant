@@ -1,13 +1,17 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/security/vault_bootstrap_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
+import '../../../core/security/pwned_passwords_service.dart';
 
 class SetupController extends ChangeNotifier {
   SetupController({
     VaultBootstrapService? service,
-  }) : _service = service ?? VaultBootstrapService(SecureStorageService());
+    PwnedPasswordsService? pwnedService,
+  })  : _service = service ?? VaultBootstrapService(SecureStorageService()),
+        _pwnedService = pwnedService ?? PwnedPasswordsService();
 
   final VaultBootstrapService _service;
+  final PwnedPasswordsService _pwnedService;
 
   bool _busy = false;
   String? _error;
@@ -54,6 +58,13 @@ class SetupController extends ChangeNotifier {
         );
       }
 
+      final pwnCount = await _pwnedService.getPwnCount(a);
+      if (pwnCount > 0) {
+        throw Exception(
+          'Esta contraseña es insegura, aparece en filtraciones. Por favor, elige otra.',
+        );
+      }
+
       await _service.createVault(masterPassword: a);
 
       try {
@@ -72,5 +83,11 @@ class SetupController extends ChangeNotifier {
     } finally {
       _setBusy(false);
     }
+  }
+
+  @override
+  void dispose() {
+    _pwnedService.dispose();
+    super.dispose();
   }
 }

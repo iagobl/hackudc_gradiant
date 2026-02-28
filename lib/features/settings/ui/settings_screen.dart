@@ -298,7 +298,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       } else {
                         final hasUppercase = newPass.contains(RegExp(r'[A-Z]'));
                         final hasSpecial =
-                        newPass.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+                        newPass.contains(RegExp(r'[^a-zA-Z0-9]'));
+
                         if (newPass.length < 12 || !hasUppercase || !hasSpecial) {
                           newError =
                           'Debe tener al menos 12 caracteres, contener caracteres especiales y mayúsculas';
