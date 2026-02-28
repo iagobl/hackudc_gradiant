@@ -349,6 +349,175 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+
+  Future<void> _cloudSignInOrUp() async {
+    final creds = await _askForCloudCredentials();
+    if (creds == null) return;
+
+    try {
+      await _controller.signInCloud(email: creds.email, password: creds.password);
+    } catch (_) {
+      if (!mounted) return;
+      final create = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Cuenta no encontrada'),
+          content: const Text('¿Quieres crear una cuenta en Supabase con este email?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Crear')),
+          ],
+        ),
+      );
+      if (create == true) {
+        await _controller.signUpCloud(email: creds.email, password: creds.password);
+      }
+    }
+  }
+
+  Future<void> _cloudSignOut() async {
+    try {
+      await _controller.signOutCloud();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesión cerrada.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+
+  Future<void> _onToggleCloud(bool enable) async {
+    try {
+      if (!enable) {
+        await _controller.setCloudEnabled(enabled: false);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sincronización en cloud desactivada.')),
+        );
+        return;
+      }
+
+      if (!_controller.cloudSignedIn) {
+        await _cloudSignInOrUp();
+        if (!_controller.cloudSignedIn) return;
+      }
+
+      final master = await _askForMasterPassword(validate: true);
+      if (master == null) return;
+
+      await _controller.setCloudEnabled(enabled: true, masterPassword: master);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cloud activado. Migración inicial completada.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _syncNow() async {
+    try {
+      await _controller.syncNow();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sincronización completada.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _importFromCloud() async {
+    try {
+      final master = await _askForMasterPassword(validate: true);
+      if (master == null) return;
+
+      final imported = await _controller.importFromCloud(masterPassword: master);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Importadas/actualizadas: $imported entradas.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<_CloudCreds?> _askForCloudCredentials() async {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+
+    return showDialog<_CloudCreds>(
+      context: context,
+      builder: (context) {
+        String? error;
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Supabase'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Inicia sesión para activar sincronización e importar.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'Email',
+                    errorText: error,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Contraseña',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final email = emailController.text.trim();
+                  final pass = passwordController.text;
+                  if (!email.contains('@') || pass.length < 6) {
+                    setState(() => error = 'Email válido y contraseña (>=6).');
+                    return;
+                  }
+                  Navigator.pop(context, _CloudCreds(email: email, password: pass));
+                },
+                child: const Text('Continuar'),
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
   String _getLockText(int seconds) {
     if (seconds == 0) return 'Bloqueo inmediato';
     if (seconds == -1) return 'Nunca';
@@ -469,6 +638,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: _importVault,
               ),
               const Divider(),
+              _buildSectionTitle('Cloud'),
+              ListTile(
+                leading: Icon(_controller.cloudEnabled ? Icons.cloud_done_rounded : Icons.cloud_off_rounded),
+                title: const Text('Sincronización en Cloud'),
+                subtitle: Text(_controller.cloudEnabled
+                    ? 'Activada${_controller.cloudSignedIn ? ' • ${_controller.cloudUserEmail ?? ''}' : ''}'
+                    : 'Desactivada'),
+                trailing: Switch(
+                  value: _controller.cloudEnabled,
+                  onChanged: (v) async => _onToggleCloud(v),
+                ),
+              ),
+              const Divider(indent: 70),
+              ListTile(
+                leading: Icon(_controller.cloudSignedIn ? Icons.logout_rounded : Icons.login_rounded),
+                title: Text(_controller.cloudSignedIn ? 'Cerrar sesión (Supabase)' : 'Iniciar sesión (Supabase)'),
+                subtitle: Text(_controller.cloudSignedIn
+                    ? 'Cuenta: ${_controller.cloudUserEmail ?? ''}'
+                    : 'Necesario para sincronizar e importar'),
+                onTap: _controller.cloudSignedIn ? _cloudSignOut : _cloudSignInOrUp,
+              ),
+              const Divider(indent: 70),
+              ListTile(
+                leading: const Icon(Icons.sync_rounded),
+                title: const Text('Sincronizar ahora'),
+                subtitle: const Text('Sube las contraseñas locales al cloud'),
+                enabled: _controller.cloudEnabled && _controller.cloudSignedIn,
+                onTap: _syncNow,
+              ),
+              const Divider(indent: 70),
+              ListTile(
+                leading: const Icon(Icons.download_for_offline_rounded),
+                title: const Text('Importar desde Cloud'),
+                subtitle: const Text('Descarga y fusiona las contraseñas del cloud a local'),
+                enabled: _controller.cloudSignedIn,
+                onTap: _importFromCloud,
+              ),
+              const Divider(),
               _buildSectionTitle('Información'),
               const ListTile(
                 leading: Icon(Icons.info_outline_rounded),
@@ -486,4 +693,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+}
+
+
+class _CloudCreds {
+  _CloudCreds({required this.email, required this.password});
+  final String email;
+  final String password;
 }

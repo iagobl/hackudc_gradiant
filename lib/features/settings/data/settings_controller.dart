@@ -2,6 +2,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/cloud/cloud_auth_service.dart';
+import '../../../core/cloud/cloud_sync_manager.dart';
+import '../../../core/cloud/cloud_sync_service.dart';
+import '../../../core/cloud/cloud_sync_settings_service.dart';
 import '../../../core/security/vault_bootstrap_service.dart';
 import '../../../core/storage/app_database.dart';
 import '../../../core/storage/secure_storage_service.dart';
@@ -14,16 +18,32 @@ class SettingsController extends ChangeNotifier {
     SecureStorageService? storage,
     VaultRepository? repo,
     VaultImportExportService? importExport,
+    CloudSyncSettingsService? cloudSettings,
+    CloudAuthService? cloudAuth,
+    CloudSyncService? cloudSync,
   })  : _storage = storage ?? SecureStorageService(),
         _bootstrap = bootstrap ?? VaultBootstrapService(storage ?? SecureStorageService()),
         _repo = repo ?? VaultRepository(AppDatabase.instance),
         _importExport = importExport ??
-            VaultImportExportService(repo ?? VaultRepository(AppDatabase.instance));
+            VaultImportExportService(repo ?? VaultRepository(AppDatabase.instance)),
+        _cloudSettings = cloudSettings ?? CloudSyncSettingsService(storage ?? SecureStorageService()),
+        _cloudAuth = cloudAuth ?? const CloudAuthService(),
+        _cloudSync = cloudSync ??
+            CloudSyncService(
+              auth: cloudAuth ?? const CloudAuthService(),
+              localRepo: repo ?? VaultRepository(AppDatabase.instance),
+              db: AppDatabase.instance,
+              storage: storage ?? SecureStorageService(),
+            );
 
   final VaultBootstrapService _bootstrap;
   final SecureStorageService _storage;
   final VaultRepository _repo;
   final VaultImportExportService _importExport;
+
+  final CloudSyncSettingsService _cloudSettings;
+  final CloudAuthService _cloudAuth;
+  final CloudSyncService _cloudSync;
 
   static const String kAutoLockKey = 'settings_auto_lock_seconds';
 
@@ -31,9 +51,15 @@ class SettingsController extends ChangeNotifier {
   bool _loading = true;
   int _autoLockSeconds = 30;
 
+  bool _cloudEnabled = false;
+
   bool get biometricsEnabled => _biometricsEnabled;
   bool get loading => _loading;
   int get autoLockSeconds => _autoLockSeconds;
+
+  bool get cloudEnabled => _cloudEnabled;
+  bool get cloudSignedIn => _cloudAuth.isSignedIn;
+  String? get cloudUserEmail => _cloudAuth.currentUser?.email;
 
   void _setLoading(bool value) {
     _loading = value;
@@ -46,8 +72,11 @@ class SettingsController extends ChangeNotifier {
       final lockStr = await _storage.readString(kAutoLockKey);
       final lockVal = int.tryParse(lockStr ?? '30') ?? 30;
 
+      final cloudEnabled = await _cloudSettings.isEnabled();
+
       _biometricsEnabled = bioEnabled;
       _autoLockSeconds = lockVal;
+      _cloudEnabled = cloudEnabled;
     } finally {
       _loading = false;
       notifyListeners();
@@ -101,5 +130,76 @@ class SettingsController extends ChangeNotifier {
       oldPassword: oldPassword,
       newPassword: newPassword,
     );
+  }
+
+  Future<void> signInCloud({
+    required String email,
+    required String password,
+  }) async {
+    await _cloudAuth.signInWithPassword(email: email, password: password);
+    notifyListeners();
+  }
+
+  Future<void> signUpCloud({
+    required String email,
+    required String password,
+  }) async {
+    await _cloudAuth.signUpWithPassword(email: email, password: password);
+    notifyListeners();
+  }
+
+  Future<void> signOutCloud() async {
+    await _cloudAuth.signOut();
+    notifyListeners();
+  }
+
+  Future<void> setCloudEnabled({
+    required bool enabled,
+    String? masterPassword,
+  }) async {
+    if (!enabled) {
+      await _cloudSettings.setEnabled(false);
+      _cloudEnabled = false;
+      await CloudSyncManager.instance.stop();
+      await CloudSyncManager.instance.start();
+      notifyListeners();
+      return;
+    }
+
+    if (!_cloudAuth.isSignedIn) {
+      throw Exception('Inicia sesión en Supabase primero.');
+    }
+    if (masterPassword == null || masterPassword.isEmpty) {
+      throw Exception('Necesitamos tu clave maestra para activar el cloud.');
+    }
+
+    await validateMasterPassword(masterPassword);
+
+    await _cloudSettings.setEnabled(true);
+    _cloudEnabled = true;
+
+    await _cloudSync.bootstrapCloud(masterPassword: masterPassword);
+
+    await CloudSyncManager.instance.start();
+
+    notifyListeners();
+  }
+
+  Future<int> importFromCloud({required String masterPassword}) async {
+    if (!_cloudAuth.isSignedIn) {
+      throw Exception('Inicia sesión en Supabase primero.');
+    }
+    if (masterPassword.isEmpty) {
+      throw Exception('Introduce la clave maestra.');
+    }
+    await validateMasterPassword(masterPassword);
+
+    final count = await _cloudSync.importFromCloud(masterPassword: masterPassword);
+    return count;
+  }
+
+  Future<void> syncNow() async {
+    if (!_cloudAuth.isSignedIn) throw Exception('Inicia sesión en Supabase primero.');
+    await _cloudSync.pushAllLocalEntries();
   }
 }

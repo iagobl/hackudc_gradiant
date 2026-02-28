@@ -10,48 +10,36 @@ class CryptoService {
   final AesGcm _aes = AesGcm.with256bits();
   final _rng = Random.secure();
 
-  /// Genera bytes altamente aleatorios mezclando múltiples fuentes de entropía
-  /// para evitar la vulnerabilidad de "semilla conocida".
   Uint8List getRandomBytes(int length) {
     final result = Uint8List(length);
     for (int i = 0; i < length; i++) {
-      // Mezclamos:
-      // 1. Random.secure() del SO
-      // 2. Microsegundos actuales (ruido temporal de alta resolución)
-      // 3. Un contador para asegurar que cada byte sea distinto incluso en el mismo microsegundo
       final timePart = DateTime.now().microsecondsSinceEpoch;
       final osPart = _rng.nextInt(1 << 32);
-      
-      // Pasamos por SHA-256 para "blanquear" la entropía y eliminar sesgos
+
       final mixed = sha256.convert(utf8.encode('$timePart-$osPart-$i'));
-      
-      // Tomamos un byte del hash y lo mezclamos con otro valor del SO
+
       result[i] = mixed.bytes[0] ^ _rng.nextInt(256);
     }
     return result;
   }
 
-  /// Genera un entero aleatorio entre 0 y max-1 usando entropía endurecida
   int nextInt(int max) {
     if (max <= 0) return 0;
-    // Usamos 4 bytes para obtener un entero de 32 bits y aplicamos el módulo
     final bytes = getRandomBytes(4);
     final view = ByteData.sublistView(bytes);
     return view.getUint32(0) % max;
   }
 
-  /// Genera la DEK usando el nuevo generador endurecido
   Future<SecretKey> generateDEK() async {
     final bytes = getRandomBytes(32);
     return SecretKey(bytes);
   }
 
-  /// Cifra datos con AES-GCM
   Future<SecretBox> encrypt({
     required Uint8List plain,
     required SecretKey key,
   }) async {
-    final nonce = getRandomBytes(12); // Nonce de 96 bits recomendado para GCM
+    final nonce = getRandomBytes(12);
     final secretBox = await _aes.encrypt(
       plain,
       secretKey: key,
@@ -60,7 +48,6 @@ class CryptoService {
     return secretBox;
   }
 
-  /// Descifra datos con AES-GCM
   Future<Uint8List> decrypt({
     required SecretBox box,
     required SecretKey key,
@@ -69,7 +56,6 @@ class CryptoService {
     return Uint8List.fromList(bytes);
   }
 
-  /// Cifra bytes con una KEK (Key Encryption Key) usando AES-GCM
   Future<Uint8List> encryptWithKEK({
     required Uint8List plain,
     required SecretKey kek,
@@ -81,7 +67,6 @@ class CryptoService {
     return secretBox.concatenation();
   }
 
-  /// Descifra bytes con una KEK (Key Encryption Key) usando AES-GCM
   Future<Uint8List> decryptWithKEK({
     required Uint8List cipherText,
     required SecretKey kek,
@@ -95,7 +80,6 @@ class CryptoService {
     return Uint8List.fromList(bytes);
   }
 
-  /// ENVOLVER DEK con KEM post-cuántico (Ejecutado en un Isolate para evitar bloqueos)
   Future<Map<String, Uint8List>> wrapDEKPostQuantum({
     required SecretKey dek,
     required String kemName,
@@ -107,7 +91,6 @@ class CryptoService {
     });
   }
 
-  /// DESENVOLVER DEK con KEM post-cuántico (Ejecutado en un Isolate para evitar bloqueos)
   Future<SecretKey> unwrapDEKPostQuantum({
     required Uint8List cipherDEK,
     required Uint8List ciphertextKEM,
