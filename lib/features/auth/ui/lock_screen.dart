@@ -11,6 +11,8 @@ class LockScreen extends StatefulWidget {
 }
 
 class _LockScreenState extends State<LockScreen> {
+  static const Color _accentBlue = Color(0xFF2563EB);
+
   final _pw = TextEditingController();
 
   bool _busy = false;
@@ -49,7 +51,6 @@ class _LockScreenState extends State<LockScreen> {
     try {
       final service = VaultBootstrapService(SecureStorageService());
 
-      // ✅ UNA sola operación biométrica (read)
       await service.unlockVaultWithBiometrics();
 
       if (!mounted) return;
@@ -57,7 +58,8 @@ class _LockScreenState extends State<LockScreen> {
         MaterialPageRoute(builder: (_) => const HomeShell(initialIndex: 0)),
       );
     } on StateError catch (e) {
-      setState(() => _error = '${e.message}. Desbloquea una vez con la clave maestra para activarla.');
+      setState(() => _error =
+      '${e.message}. Desbloquea una vez con la clave maestra para activarla.');
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -96,86 +98,260 @@ class _LockScreenState extends State<LockScreen> {
     super.dispose();
   }
 
+  InputDecoration _dec(BuildContext context, {required String label, Widget? suffix}) {
+    final cs = Theme.of(context).colorScheme;
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: cs.surface,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.55)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.45)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _accentBlue, width: 1.6),
+      ),
+      suffixIcon: suffix,
+    );
+  }
+
+  Widget _block(BuildContext context, {required Widget child}) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.outlineVariant.withOpacity(0.28)),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bigButtonStyle = FilledButton.styleFrom(
-      minimumSize: const Size.fromHeight(52),
-      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final localTheme = theme.copyWith(
+      colorScheme: cs.copyWith(primary: _accentBlue, secondary: _accentBlue),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: _accentBlue,
+          foregroundColor: Colors.white,
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _accentBlue,
+          side: BorderSide(color: _accentBlue.withOpacity(0.35)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        ),
+      ),
     );
 
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(title: const Text('Desbloquear vault')),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Para acceder a tus contraseñas, confirma tu identidad.',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(height: 16),
-
-                    FilledButton.icon(
-                      style: bigButtonStyle,
-                      onPressed: _busy ? null : _tryBiometric,
-                      icon: const Icon(Icons.fingerprint),
-                      label: const Text('Usar huella / biometría'),
-                    ),
-
-                    const SizedBox(height: 20),
-                    const Text('O desbloquea con tu clave maestra:'),
-                    const SizedBox(height: 8),
-
-                    TextField(
-                      controller: _pw,
-                      obscureText: _obscure,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _busy ? null : _unlockWithMaster(),
-                      decoration: InputDecoration(
-                        labelText: 'Clave maestra',
-                        suffixIcon: IconButton(
-                          onPressed: _busy ? null : () => setState(() => _obscure = !_obscure),
-                          icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+    return Theme(
+      data: localTheme,
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              _accentBlue.withOpacity(0.18),
+                              _accentBlue.withOpacity(0.06),
+                            ],
+                          ),
+                          border: Border.all(color: _accentBlue.withOpacity(0.18)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 54,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                color: _accentBlue.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: const Icon(
+                                Icons.shield_rounded,
+                                size: 28,
+                                color: _accentBlue,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Desbloquear vault',
+                                    style: theme.textTheme.headlineSmall?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.2,
+                                      color: cs.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Confirma tu identidad para acceder a tus contraseñas.',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 12),
-                    if (_error != null)
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red, fontSize: 14),
+                      const SizedBox(height: 14),
+
+                      _block(
+                        context,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: _accentBlue.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.fingerprint_rounded,
+                                color: _accentBlue,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Huella / biometría',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Acceso rápido y seguro',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            OutlinedButton(
+                              onPressed: _busy ? null : _tryBiometric,
+                              child: _busy
+                                  ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                                  : const Text('Usar'),
+                            ),
+                          ],
+                        ),
                       ),
-                  ],
-                ),
-              ),
-            ),
 
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: bigButtonStyle,
-                  onPressed: _busy ? null : _unlockWithMaster,
-                  child: _busy
-                      ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                      : const Text('Desbloquear'),
+                      const SizedBox(height: 14),
+
+                      _block(
+                        context,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Clave maestra',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: _pw,
+                              obscureText: _obscure,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _busy ? null : _unlockWithMaster(),
+                              decoration: _dec(
+                                context,
+                                label: 'Introduce tu clave maestra',
+                                suffix: IconButton(
+                                  onPressed:
+                                  _busy ? null : () => setState(() => _obscure = !_obscure),
+                                  icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            if (_error != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  _error!,
+                                  style: TextStyle(
+                                    color: cs.error,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _busy ? null : _unlockWithMaster,
+                    child: _busy
+                        ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                        : const Text('Desbloquear'),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -13,7 +13,6 @@ class VaultAddScreen extends StatefulWidget {
 }
 
 class _VaultAddScreenState extends State<VaultAddScreen> {
-  // ✅ Azul consistente (el de HomeShell)
   static const Color _accentBlue = Color(0xFF2563EB);
 
   final _title = TextEditingController();
@@ -147,14 +146,13 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
     super.dispose();
   }
 
-  // ✅ Campos blancos dentro del bloque gris
   InputDecoration _fieldDecoration(BuildContext context, {required String label, Widget? suffix}) {
     final cs = Theme.of(context).colorScheme;
 
     return InputDecoration(
       labelText: label,
       filled: true,
-      fillColor: cs.surface, // ⬅️ blanco
+      fillColor: cs.surface,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.55)),
@@ -165,19 +163,18 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _accentBlue, width: 1.6), // ⬅️ azul
+        borderSide: const BorderSide(color: _accentBlue, width: 1.6),
       ),
       suffixIcon: suffix,
     );
   }
 
-  // ✅ Bloques grises
   Widget _block(BuildContext context, {required Widget child}) {
     final cs = Theme.of(context).colorScheme;
 
     return Container(
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest, // ⬅️ gris suave del sistema
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: cs.outlineVariant.withOpacity(0.28)),
       ),
@@ -191,7 +188,6 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    // ✅ Aseguramos azul en botones y toggles SOLO en esta pantalla
     final localTheme = theme.copyWith(
       colorScheme: cs.copyWith(primary: _accentBlue, secondary: _accentBlue),
       switchTheme: SwitchThemeData(
@@ -237,7 +233,6 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      // ✅ Bloque 1: Servicio + URL (bloque gris, campos blancos)
                       _block(
                         context,
                         child: Column(
@@ -270,7 +265,6 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
 
                       const SizedBox(height: 14),
 
-                      // ✅ Bloque 2: Usuario + Contraseña + botón pequeño dentro del bloque
                       _block(
                         context,
                         child: Column(
@@ -304,7 +298,6 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
 
                             const SizedBox(height: 14),
 
-                            // ✅ Botón NO ocupa todo el ancho (como antes) pero dentro del bloque
                             Align(
                               alignment: Alignment.center,
                               child: OutlinedButton.icon(
@@ -328,7 +321,6 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
 
                       const SizedBox(height: 14),
 
-                      // ✅ Switch al final (debajo de los dos bloques)
                       Container(
                         decoration: BoxDecoration(
                           color: cs.surface,
@@ -338,7 +330,7 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
                         child: SwitchListTile(
                           title: const Text('Requerir clave maestra para ver'),
                           subtitle: const Text(
-                            'Se pedirá la contraseña cada vez que intentes revelar esta entrada',
+                            'Se pedirá la contraseña cada vez que intentes revelar esta contraseña',
                           ),
                           value: _requireMasterPassword,
                           onChanged: (v) => setState(() => _requireMasterPassword = v),
