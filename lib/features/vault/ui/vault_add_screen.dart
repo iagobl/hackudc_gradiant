@@ -13,6 +13,9 @@ class VaultAddScreen extends StatefulWidget {
 }
 
 class _VaultAddScreenState extends State<VaultAddScreen> {
+  // ✅ Azul consistente (el de HomeShell)
+  static const Color _accentBlue = Color(0xFF2563EB);
+
   final _title = TextEditingController();
   final _user = TextEditingController();
   final _pass = TextEditingController();
@@ -137,113 +140,235 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
     _user.dispose();
     _pass.dispose();
     _url.dispose();
+    _titleFocus.dispose();
+    _userFocus.dispose();
+    _urlFocus.dispose();
+    _passFocus.dispose();
     super.dispose();
+  }
+
+  // ✅ Campos blancos dentro del bloque gris
+  InputDecoration _fieldDecoration(BuildContext context, {required String label, Widget? suffix}) {
+    final cs = Theme.of(context).colorScheme;
+
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: cs.surface, // ⬅️ blanco
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.55)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.45)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _accentBlue, width: 1.6), // ⬅️ azul
+      ),
+      suffixIcon: suffix,
+    );
+  }
+
+  // ✅ Bloques grises
+  Widget _block(BuildContext context, {required Widget child}) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest, // ⬅️ gris suave del sistema
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.outlineVariant.withOpacity(0.28)),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: child,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final bigButtonStyle = FilledButton.styleFrom(
-      minimumSize: const Size.fromHeight(52),
-      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    // ✅ Aseguramos azul en botones y toggles SOLO en esta pantalla
+    final localTheme = theme.copyWith(
+      colorScheme: cs.copyWith(primary: _accentBlue, secondary: _accentBlue),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return _accentBlue;
+          return null;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return _accentBlue.withOpacity(0.35);
+          return null;
+        }),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: _accentBlue,
+          foregroundColor: Colors.white,
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _accentBlue,
+          side: BorderSide(color: _accentBlue.withOpacity(0.35)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
     );
 
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(title: const Text('Añadir contraseña')),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _title,
-                      focusNode: _titleFocus,
-                      textInputAction: TextInputAction.next,
-                      onSubmitted: (_) => _userFocus.requestFocus(),
-                      decoration: const InputDecoration(labelText: 'Servicio (ej: Google)'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _user,
-                      focusNode: _userFocus,
-                      textInputAction: TextInputAction.next,
-                      onSubmitted: (_) => _urlFocus.requestFocus(),
-                      decoration: const InputDecoration(labelText: 'Usuario / Email'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _url,
-                      focusNode: _urlFocus,
-                      textInputAction: TextInputAction.next,
-                      onSubmitted: (_) => _passFocus.requestFocus(),
-                      decoration: const InputDecoration(labelText: 'URL (opcional)'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _pass,
-                      focusNode: _passFocus,
-                      textInputAction: TextInputAction.done,
-                      obscureText: _obscure,
-                      decoration: InputDecoration(
-                        labelText: 'Contraseña',
-                        suffixIcon: IconButton(
-                          onPressed: _busy ? null : () => setState(() => _obscure = !_obscure),
-                          icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+    return Theme(
+      data: localTheme,
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(title: const Text('Añadir contraseña')),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // ✅ Bloque 1: Servicio + URL (bloque gris, campos blancos)
+                      _block(
+                        context,
+                        child: Column(
+                          children: [
+                            TextField(
+                              controller: _title,
+                              focusNode: _titleFocus,
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) => _userFocus.requestFocus(),
+                              decoration: _fieldDecoration(
+                                context,
+                                label: 'Servicio (ej: Google)',
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _url,
+                              focusNode: _urlFocus,
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) => _passFocus.requestFocus(),
+                              decoration: _fieldDecoration(
+                                context,
+                                label: 'URL (opcional)',
+                                suffix: Icon(Icons.link_rounded, color: cs.onSurfaceVariant),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 14),
 
-                    SwitchListTile(
-                      title: const Text('Requerir clave maestra para ver'),
-                      subtitle: const Text('Se pedirá la contraseña cada vez que intentes revelar esta entrada'),
-                      value: _requireMasterPassword,
-                      onChanged: (v) => setState(() => _requireMasterPassword = v),
-                    ),
+                      // ✅ Bloque 2: Usuario + Contraseña + botón pequeño dentro del bloque
+                      _block(
+                        context,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextField(
+                              controller: _user,
+                              focusNode: _userFocus,
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) => _urlFocus.requestFocus(),
+                              decoration: _fieldDecoration(
+                                context,
+                                label: 'Usuario / Email',
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _pass,
+                              focusNode: _passFocus,
+                              textInputAction: TextInputAction.done,
+                              obscureText: _obscure,
+                              decoration: _fieldDecoration(
+                                context,
+                                label: 'Contraseña',
+                                suffix: IconButton(
+                                  onPressed: _busy ? null : () => setState(() => _obscure = !_obscure),
+                                  icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                                ),
+                              ),
+                            ),
 
-                    const SizedBox(height: 16),
+                            const SizedBox(height: 14),
 
-                    OutlinedButton.icon(
-                      onPressed: _busy || _checking ? null : _checkPwned,
-                      icon: _checking
-                          ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                          : const Icon(Icons.security),
-                      label: const Text('Comprobar filtración'),
-                    ),
+                            // ✅ Botón NO ocupa todo el ancho (como antes) pero dentro del bloque
+                            Align(
+                              alignment: Alignment.center,
+                              child: OutlinedButton.icon(
+                                onPressed: _busy || _checking ? null : _checkPwned,
+                                icon: _checking
+                                    ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                                    : const Icon(Icons.security_rounded),
+                                label: const Text('Comprobar filtración'),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
 
-                    const SizedBox(height: 24),
-                  ],
+                      const SizedBox(height: 14),
+
+                      // ✅ Switch al final (debajo de los dos bloques)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: cs.surface,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: cs.outlineVariant.withOpacity(0.25)),
+                        ),
+                        child: SwitchListTile(
+                          title: const Text('Requerir clave maestra para ver'),
+                          subtitle: const Text(
+                            'Se pedirá la contraseña cada vez que intentes revelar esta entrada',
+                          ),
+                          value: _requireMasterPassword,
+                          onChanged: (v) => setState(() => _requireMasterPassword = v),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: bigButtonStyle,
-                  onPressed: _busy ? null : _save,
-                  child: _busy
-                      ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                      : const Text('Guardar'),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _busy ? null : _save,
+                    child: _busy
+                        ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                        : const Text('Guardar'),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
