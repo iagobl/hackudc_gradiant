@@ -70,6 +70,24 @@ class VaultRepository {
 
     return utf8.decode(plainBytes);
   }
+
+  Stream<List<VaultEntry>> watchEntries() {
+    final query = (_db.select(_db.vaultEntries)
+      ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
+        .watch();
+
+    return query.map(
+          (rows) => rows
+          .map((r) => VaultEntry(
+        id: r.id,
+        title: r.title,
+        username: r.username,
+        url: r.url,
+        breached: r.breached,
+      ))
+          .toList(),
+    );
+  }
 }
 
 class VaultEntry {

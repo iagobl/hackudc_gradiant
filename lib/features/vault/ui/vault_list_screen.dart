@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/storage/app_database.dart' as db;
 import '../data/vault_repository.dart';
 import 'vault_add_screen.dart';
+import 'vault_detail_screen.dart';
 
 class VaultListScreen extends StatefulWidget {
   const VaultListScreen({super.key});
@@ -13,25 +14,18 @@ class VaultListScreen extends StatefulWidget {
 class _VaultListScreenState extends State<VaultListScreen> {
   late final db.AppDatabase _db;
   late final VaultRepository _repo;
-  late Future<List<VaultEntry>> _load;
 
   @override
   void initState() {
     super.initState();
     _db = db.AppDatabase();
     _repo = VaultRepository(_db);
-    _load = _repo.listEntries();
-  }
-
-  Future<void> _reload() async {
-    setState(() => _load = _repo.listEntries());
   }
 
   Future<void> _openAdd() async {
-    final created = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => VaultAddScreen(repo: _repo)),
     );
-    if (created == true) await _reload();
   }
 
   @override
@@ -44,10 +38,13 @@ class _VaultListScreenState extends State<VaultListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Mis contraseñas')),
-      body: FutureBuilder<List<VaultEntry>>(
-        future: _load,
+      body: StreamBuilder<List<VaultEntry>>(
+        stream: _repo.watchEntries(),
         builder: (context, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
           final entries = snap.data!;
           if (entries.isEmpty) {
             return const Center(
@@ -71,21 +68,10 @@ class _VaultListScreenState extends State<VaultListScreen> {
                 title: Text(e.title, style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text(e.username ?? ''),
                 trailing: Icon(e.breached ? Icons.warning_amber : Icons.lock),
-                onTap: () async {
-                  // Demo: mostrar contraseña. Luego lo haremos en pantalla detalle segura.
-                  final pw = await _repo.decryptPassword(e.id);
-                  if (!context.mounted) return;
-                  showDialog(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: Text(e.title),
-                      content: Text('Contraseña (demo):\n$pw'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cerrar'),
-                        ),
-                      ],
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => VaultDetailScreen(repo: _repo, entry: e),
                     ),
                   );
                 },
