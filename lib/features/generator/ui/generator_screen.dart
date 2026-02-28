@@ -49,9 +49,6 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
     final chars = <String>[];
 
-    final totalMin = _minDigits + _minSymbols;
-    final length = _length < totalMin ? totalMin : _length;
-
     void addFrom(String source, int count) {
       final filtered = _avoidAmbiguous
           ? source.split('').where((c) => !_ambiguous.contains(c)).join()
@@ -59,7 +56,6 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
       for (int i = 0; i < count; i++) {
         if (filtered.isNotEmpty) {
-          // Usamos el nuevo nextInt con entropía mezclada
           chars.add(filtered[_crypto.nextInt(filtered.length)]);
         }
       }
@@ -68,11 +64,14 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
     if (_digits) addFrom(_digitChars, _minDigits);
     if (_symbols) addFrom(_symbolChars, _minSymbols);
 
-    while (chars.length < length) {
+    while (chars.length < _length) {
       chars.add(alphabet[_crypto.nextInt(alphabet.length)]);
     }
 
-    // Barajado final (Shuffle) usando también entropía endurecida
+    if (chars.length > _length) {
+      chars.removeRange(_length, chars.length);
+    }
+
     for (int i = chars.length - 1; i > 0; i--) {
       int j = _crypto.nextInt(i + 1);
       var temp = chars[i];
@@ -85,6 +84,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
   int _strengthScore(String pw) {
     int score = 0;
+    if (pw.isEmpty) return 0;
     score += (pw.length >= 8) ? 15 : 0;
     score += (pw.length >= 12) ? 25 : 0;
     score += (pw.length >= 16) ? 25 : 0;
@@ -120,17 +120,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.surface,
-        surfaceTintColor: cs.surface,
-        elevation: 0,
-        title: Text(
-          'Generar contraseña',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.2,
-            color: cs.onSurface,
-          ),
-        ),
+        title: const Text('Generar contraseña', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: Column(
@@ -142,16 +132,15 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
-                      'Generador endurecido con entropía acumulativa (SO + Tiempo + Hash).',
+                      'Generador endurecido con entropía acumulativa.',
                       style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                     const SizedBox(height: 16),
 
-                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -186,11 +175,11 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                       ],
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     Text(
                       'Longitud: $_length',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     Slider(
                       value: _length.toDouble(),
@@ -198,10 +187,22 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                       max: 64,
                       divisions: 56,
                       label: '$_length',
-                      onChanged: (v) => setState(() => _length = v.round()),
+                      onChanged: (v) {
+                        setState(() {
+                          _length = v.round();
+                          // AJUSTE DINÁMICO: Si el largo es menor a los mínimos requeridos, reducimos los mínimos.
+                          while (_minDigits + _minSymbols > _length) {
+                            if (_minSymbols > 0) {
+                              _minSymbols--;
+                            } else if (_minDigits > 0) {
+                              _minDigits--;
+                            }
+                          }
+                        });
+                      },
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
 
                     SwitchListTile(
                       value: _upper,
@@ -215,12 +216,18 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                     ),
                     SwitchListTile(
                       value: _digits,
-                      onChanged: (v) => setState(() => _digits = v),
+                      onChanged: (v) => setState(() {
+                        _digits = v;
+                        if (!v) _minDigits = 0;
+                      }),
                       title: const Text('Incluir números'),
                     ),
                     SwitchListTile(
                       value: _symbols,
-                      onChanged: (v) => setState(() => _symbols = v),
+                      onChanged: (v) => setState(() {
+                        _symbols = v;
+                        if (!v) _minSymbols = 0;
+                      }),
                       title: const Text('Incluir símbolos'),
                     ),
                     SwitchListTile(
@@ -229,29 +236,37 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                       title: const Text('Evitar caracteres confusos'),
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
                     const Text(
                       'Requisitos mínimos',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
 
                     _MinSelector(
                       label: 'Mínimo números',
                       value: _minDigits,
-                      onMinus: () => setState(
-                            () => _minDigits = (_minDigits > 0) ? _minDigits - 1 : 0,
-                      ),
-                      onPlus: () => setState(() => _minDigits++),
+                      enabled: _digits,
+                      onMinus: () => setState(() => _minDigits = _minDigits > 0 ? _minDigits - 1 : 0),
+                      onPlus: () {
+                        // REGLA: No permitir que la suma supere el largo total
+                        if (_digits && (_minDigits + _minSymbols < _length)) {
+                          setState(() => _minDigits++);
+                        }
+                      },
                     ),
 
                     _MinSelector(
                       label: 'Mínimo símbolos',
                       value: _minSymbols,
-                      onMinus: () => setState(
-                            () => _minSymbols = (_minSymbols > 0) ? _minSymbols - 1 : 0,
-                      ),
-                      onPlus: () => setState(() => _minSymbols++),
+                      enabled: _symbols,
+                      onMinus: () => setState(() => _minSymbols = _minSymbols > 0 ? _minSymbols - 1 : 0),
+                      onPlus: () {
+                        // REGLA: No permitir que la suma supere el largo total
+                        if (_symbols && (_minDigits + _minSymbols < _length)) {
+                          setState(() => _minSymbols++);
+                        }
+                      },
                     ),
 
                     const SizedBox(height: 12),
@@ -284,28 +299,36 @@ class _MinSelector extends StatelessWidget {
     required this.value,
     required this.onMinus,
     required this.onPlus,
+    this.enabled = true,
   });
 
   final String label;
   final int value;
   final VoidCallback onMinus;
   final VoidCallback onPlus;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(label)),
-        IconButton(
-          onPressed: onMinus,
-          icon: const Icon(Icons.remove_circle_outline),
-        ),
-        Text(value.toString(), style: const TextStyle(fontSize: 16)),
-        IconButton(
-          onPressed: onPlus,
-          icon: const Icon(Icons.add_circle_outline),
-        ),
-      ],
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.4,
+      child: Row(
+        children: [
+          Expanded(child: Text(label)),
+          IconButton(
+            onPressed: enabled ? onMinus : null,
+            icon: const Icon(Icons.remove_circle_outline),
+          ),
+          SizedBox(
+            width: 30,
+            child: Text(value.toString(), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+          IconButton(
+            onPressed: enabled ? onPlus : null,
+            icon: const Icon(Icons.add_circle_outline),
+          ),
+        ],
+      ),
     );
   }
 }
