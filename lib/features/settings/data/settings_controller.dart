@@ -149,6 +149,9 @@ class SettingsController extends ChangeNotifier {
   }
 
   Future<void> signOutCloud() async {
+    if (_cloudEnabled) {
+      await setCloudEnabled(enabled: false);
+    }
     await _cloudAuth.signOut();
     notifyListeners();
   }
@@ -160,8 +163,9 @@ class SettingsController extends ChangeNotifier {
     if (!enabled) {
       await _cloudSettings.setEnabled(false);
       _cloudEnabled = false;
+
       await CloudSyncManager.instance.stop();
-      await CloudSyncManager.instance.start();
+
       notifyListeners();
       return;
     }

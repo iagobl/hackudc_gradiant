@@ -15,17 +15,39 @@ class CloudAuthService {
     required String email,
     required String password,
   }) async {
-    await _client.auth.signInWithPassword(email: email, password: password);
+    try {
+      await _client.auth.signInWithPassword(email: email, password: password);
+    } on AuthException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      throw Exception(e.toString());
+    }
   }
 
   Future<void> signUpWithPassword({
     required String email,
     required String password,
   }) async {
-    await _client.auth.signUp(email: email, password: password);
+    try {
+      final res = await _client.auth.signUp(email: email, password: password);
+
+      if (res.user == null) {
+        throw Exception('No se pudo crear la cuenta.');
+      }
+    } on AuthException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      throw Exception(e.toString());
+    }
   }
 
   Future<void> signOut() async {
-    await _client.auth.signOut();
+    try {
+      await _client.auth.signOut();
+    } on AuthException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      throw Exception(e.toString());
+    }
   }
 }

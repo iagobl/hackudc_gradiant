@@ -297,8 +297,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         isValid = false;
                       } else {
                         final hasUppercase = newPass.contains(RegExp(r'[A-Z]'));
-                        final hasSpecial =
-                        newPass.contains(RegExp(r'[^a-zA-Z0-9]'));
+                        final hasSpecial = newPass.contains(RegExp(r'[^a-zA-Z0-9]'));
 
                         if (newPass.length < 12 || !hasUppercase || !hasSpecial) {
                           newError =
@@ -349,38 +348,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-
   Future<void> _cloudSignInOrUp() async {
-    final creds = await _askForCloudCredentials();
-    if (creds == null) return;
-
     try {
-      await _controller.signInCloud(email: creds.email, password: creds.password);
-    } catch (_) {
-      if (!mounted) return;
-      final create = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Cuenta no encontrada'),
-          content: const Text('¿Quieres crear una cuenta en Supabase con este email?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Crear')),
-          ],
-        ),
+      await showCloudAuthDialog(
+        context,
+        onSignIn: (email, pass) => _controller.signInCloud(email: email, password: pass),
+        onSignUp: (email, pass) => _controller.signUpCloud(email: email, password: pass),
       );
-      if (create == true) {
-        await _controller.signUpCloud(email: creds.email, password: creds.password);
-      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     }
   }
 
   Future<void> _cloudSignOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cerrar sesión'),
+        content: const Text(
+          '¿Estás seguro de que quieres cerrar sesión?\n\n'
+              'La sincronización en cloud se desactivará automáticamente.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     try {
       await _controller.signOutCloud();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesión cerrada.')),
+        const SnackBar(content: Text('Sesión cerrada y cloud desactivado.')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -456,68 +467,134 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<_CloudCreds?> _askForCloudCredentials() async {
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
+  Future<void> showCloudAuthDialog(
+      BuildContext context, {
+        required Future<void> Function(String email, String password) onSignIn,
+        required Future<void> Function(String email, String password) onSignUp,
+      }) async {
+    final emailCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    final repeatCtrl = TextEditingController();
 
-    return showDialog<_CloudCreds>(
+    bool isSignUp = false;
+    String? errorText;
+
+    await showDialog(
       context: context,
-      builder: (context) {
-        String? error;
-        return StatefulBuilder(builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('Supabase'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Inicia sesión para activar sincronización e importar.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
-                    errorText: error,
-                    border: const OutlineInputBorder(),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            final showRepeat = isSignUp;
+
+            return AlertDialog(
+              title: Text(isSignUp ? 'Crear cuenta' : 'Iniciar sesión'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Email',
+                      errorText: errorText,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Contraseña',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Contraseña',
+                    ),
+                    onChanged: (_) {
+                      if (errorText != null) setState(() => errorText = null);
+                    },
                   ),
+                  if (showRepeat) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: repeatCtrl,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Repetir contraseña',
+                      ),
+                      onChanged: (_) {
+                        if (errorText != null) setState(() => errorText = null);
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => setState(() {
+                        isSignUp = !isSignUp;
+                        errorText = null;
+                      }),
+                      child: Text(
+                        isSignUp
+                            ? '¿Ya tienes cuenta? Iniciar sesión'
+                            : '¿No tienes cuenta? Crear cuenta',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final email = emailCtrl.text.trim();
+                    final pass = passCtrl.text;
+                    final repeat = repeatCtrl.text;
+
+                    if (email.isEmpty || !email.contains('@')) {
+                      setState(() => errorText = 'Introduce un email válido.');
+                      return;
+                    }
+                    if (pass.length < 6) {
+                      setState(() => errorText = 'La contraseña debe tener al menos 6 caracteres.');
+                      return;
+                    }
+                    if (isSignUp && pass != repeat) {
+                      setState(() => errorText = 'Las contraseñas no coinciden.');
+                      return;
+                    }
+
+                    try {
+                      if (isSignUp) {
+                        await onSignUp(email, pass);
+
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Cuenta creada.',
+                            ),
+                          ),
+                        );
+                      } else {
+                        await onSignIn(email, pass);
+                      }
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    } catch (e) {
+                      setState(() => errorText = e.toString().replaceFirst('Exception: ', ''));
+                    }
+                  },
+                  child: Text(isSignUp ? 'Crear' : 'Entrar'),
                 ),
               ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final email = emailController.text.trim();
-                  final pass = passwordController.text;
-                  if (!email.contains('@') || pass.length < 6) {
-                    setState(() => error = 'Email válido y contraseña (>=6).');
-                    return;
-                  }
-                  Navigator.pop(context, _CloudCreds(email: email, password: pass));
-                },
-                child: const Text('Continuar'),
-              ),
-            ],
-          );
-        });
+            );
+          },
+        );
       },
     );
   }
+
   String _getLockText(int seconds) {
     if (seconds == 0) return 'Bloqueo inmediato';
     if (seconds == -1) return 'Nunca';
@@ -693,11 +770,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-}
-
-
-class _CloudCreds {
-  _CloudCreds({required this.email, required this.password});
-  final String email;
-  final String password;
 }

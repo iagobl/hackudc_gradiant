@@ -316,7 +316,7 @@ class _SearchBar extends StatelessWidget {
             child: TextField(
               controller: controller,
               decoration: const InputDecoration(
-                hintText: 'Buscar por título o usuario...',
+                hintText: 'Buscar por servicio',
                 border: InputBorder.none,
                 isDense: true,
               ),
