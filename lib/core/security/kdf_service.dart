@@ -1,23 +1,24 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 
 class KdfService {
-  static const int iterations = 300000;
-
-  final Pbkdf2 _pbkdf2 = Pbkdf2(
-    macAlgorithm: Hmac.sha256(),
-    iterations: iterations,
-    bits: 256,
+  static final Argon2id _argon2 = Argon2id(
+    memory: 32768,
+    iterations: 3,
+    parallelism: 1,
+    hashLength: 32,
   );
 
-  Future<SecretKey> deriveKeyFromMasterPassword({
-    required String password,
-    required List<int> salt,
+  Future<SecretKey> deriveKEK({
+    required String masterPassword,
+    required Uint8List salt,
   }) async {
-    final pwBytes = utf8.encode(password);
-    return _pbkdf2.deriveKey(
-      secretKey: SecretKey(pwBytes),
-      nonce: salt, // en esta lib se usa como salt
+    final passwordBytes = utf8.encode(masterPassword.trim());
+    
+    return _argon2.deriveKey(
+      secretKey: SecretKey(passwordBytes),
+      nonce: salt,
     );
   }
 }

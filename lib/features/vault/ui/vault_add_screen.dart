@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/security/vault_state.dart';
 import '../data/vault_repository.dart';
 import '../../../core/security/pwned_passwords_service.dart';
 
@@ -103,12 +104,16 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
       if (user.isEmpty) throw Exception('Introduce el usuario/email.');
       if (pw.isEmpty) throw Exception('Introduce la contraseña.');
 
+      final dek = VaultState.instance?.dek;
+      if (dek == null) throw Exception('Vault bloqueado.');
+
       await widget.repo.addEntry(
         title: title,
         username: user,
         password: pw,
         url: url,
         pwnedCount: _pwnedCount,
+        dek: dek,
       );
 
       if (!mounted) return;
@@ -130,11 +135,6 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
     _user.dispose();
     _pass.dispose();
     _url.dispose();
-    _titleFocus.dispose();
-    _userFocus.dispose();
-    _urlFocus.dispose();
-    _passFocus.dispose();
-    _pwned.dispose();
     super.dispose();
   }
 

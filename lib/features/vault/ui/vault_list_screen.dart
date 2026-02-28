@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/storage/app_database.dart' as db;
+import '../../../core/storage/app_database.dart';
 import '../data/vault_repository.dart';
 import 'vault_add_screen.dart';
 import 'vault_detail_screen.dart';
@@ -12,13 +12,13 @@ class VaultListScreen extends StatefulWidget {
 }
 
 class _VaultListScreenState extends State<VaultListScreen> {
-  late final db.AppDatabase _db;
+  late final AppDatabase _db;
   late final VaultRepository _repo;
 
   @override
   void initState() {
     super.initState();
-    _db = db.AppDatabase();
+    _db = AppDatabase();
     _repo = VaultRepository(_db);
   }
 

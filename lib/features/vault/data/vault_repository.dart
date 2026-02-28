@@ -1,10 +1,8 @@
 import 'dart:convert';
 import 'package:cryptography/cryptography.dart';
 import '../../../core/security/crypto_service.dart';
-import '../../../core/security/vault_state.dart';
 import '../../../core/storage/app_database.dart';
 import 'package:drift/drift.dart';
-import 'dart:typed_data';
 
 class VaultRepository {
   VaultRepository(this._db);
@@ -12,28 +10,12 @@ class VaultRepository {
   final AppDatabase _db;
   final CryptoService _crypto = CryptoService();
 
-  SecretKey _requireVaultKey() {
-    final state = VaultState.instance;
-    if (state == null) throw StateError('Vault bloqueado.');
-    return state.vaultKey;
-  }
-
   Future<List<VaultEntry>> listEntries() async {
     final rows = await (_db.select(_db.vaultEntries)
           ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
         .get();
 
-    return rows
-        .map((r) => VaultEntry(
-              id: r.id,
-              title: r.title,
-              username: r.username,
-              url: r.url,
-              breached: r.breached,
-              pwnedCount: r.pwnedCount,
-              lastPwnedCheck: r.lastPwnedCheck,
-            ))
-        .toList();
+    return rows;
   }
 
   Future<void> addEntry({
@@ -41,39 +23,39 @@ class VaultRepository {
     required String username,
     required String password,
     String? url,
+    required SecretKey dek, 
     int? pwnedCount,
   }) async {
-    final key = _requireVaultKey();
-
-    final plain = utf8.encode(password);
-    final enc = await _crypto.encrypt(plain: plain, key: key);
+    final plain = Uint8List.fromList(utf8.encode(password));
+    final enc = await _crypto.encrypt(plain: plain, key: dek);
 
     await _db.into(_db.vaultEntries).insert(
-          VaultEntriesCompanion.insert(
-            title: title,
-            username: Value(username),
-            url: Value(url),
-            passwordCipher: Uint8List.fromList(enc.cipherText),
-            passwordNonce: Uint8List.fromList(enc.nonce),
-            breached: Value((pwnedCount ?? 0) > 0),
-            pwnedCount: Value(pwnedCount),
-            lastPwnedCheck: Value(pwnedCount == null ? null : DateTime.now()),
-          ),
-        );
+      VaultEntriesCompanion.insert(
+        title: title,
+        username: Value(username),
+        url: Value(url),
+        passwordCipher: Uint8List.fromList(enc.cipherText),
+        passwordNonce: Uint8List.fromList(enc.nonce),
+        passwordMac: Uint8List.fromList(enc.mac.bytes),
+        breached: Value((pwnedCount ?? 0) > 0),
+        pwnedCount: Value(pwnedCount),
+        lastPwnedCheck: Value(pwnedCount == null ? null : DateTime.now()),
+      ),
+    );
   }
 
-  Future<String> decryptPassword(int entryId) async {
-    final key = _requireVaultKey();
+  Future<String> decryptPassword(int entryId, SecretKey dek) async {
     final row = await (_db.select(_db.vaultEntries)
-          ..where((t) => t.id.equals(entryId)))
+      ..where((t) => t.id.equals(entryId)))
         .getSingle();
 
-    final plainBytes = await _crypto.decrypt(
-      cipherTextWithTag: row.passwordCipher,
+    final box = SecretBox(
+      row.passwordCipher,
       nonce: row.passwordNonce,
-      key: key,
+      mac: Mac(row.passwordMac),
     );
 
+    final plainBytes = await _crypto.decrypt(box: box, key: dek);
     return utf8.decode(plainBytes);
   }
 
@@ -92,42 +74,8 @@ class VaultRepository {
   }
 
   Stream<List<VaultEntry>> watchEntries() {
-    final query = (_db.select(_db.vaultEntries)
+    return (_db.select(_db.vaultEntries)
       ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
         .watch();
-
-    return query.map(
-          (rows) => rows
-          .map((r) => VaultEntry(
-            id: r.id,
-            title: r.title,
-            username: r.username,
-            url: r.url,
-            breached: r.breached,
-            pwnedCount: r.pwnedCount,
-            lastPwnedCheck: r.lastPwnedCheck,
-      ))
-          .toList(),
-    );
   }
-}
-
-class VaultEntry {
-  final int id;
-  final String title;
-  final String? username;
-  final String? url;
-  final bool breached;
-  final int? pwnedCount;
-  final DateTime? lastPwnedCheck;
-
-  VaultEntry({
-    required this.id,
-    required this.title,
-    required this.username,
-    required this.url,
-    required this.breached,
-    required this.pwnedCount,
-    required this.lastPwnedCheck,
-  });
 }

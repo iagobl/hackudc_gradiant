@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/security/vault_state.dart';
 import '../data/vault_repository.dart';
 import '../../../core/security/pwned_passwords_service.dart';
+import '../../../core/storage/app_database.dart';
 
 class VaultDetailScreen extends StatefulWidget {
   const VaultDetailScreen({
@@ -58,7 +60,13 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
       _error = null;
     });
     try {
-      final pw = await widget.repo.decryptPassword(widget.entry.id);
+      final dek = VaultState.instance?.dek;
+      if (dek == null) {
+        setState(() => _error = 'Vault bloqueado.');
+        return;
+      }
+
+      final pw = await widget.repo.decryptPassword(widget.entry.id, dek);
       if (!mounted) return;
       setState(() => _password = pw);
     } catch (_) {

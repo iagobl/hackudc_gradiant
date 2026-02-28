@@ -12,6 +12,7 @@ class VaultEntries extends Table {
 
   BlobColumn get passwordCipher => blob()();
   BlobColumn get passwordNonce => blob()();
+  BlobColumn get passwordMac => blob()(); // Nueva columna necesaria para AES-GCM
 
   BoolColumn get breached => boolean().withDefault(const Constant(false))();
   DateTimeColumn get lastBreachCheck => dateTime().nullable()();
@@ -28,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -39,6 +40,9 @@ class AppDatabase extends _$AppDatabase {
       if (from < 2) {
         await m.addColumn(vaultEntries, vaultEntries.pwnedCount);
         await m.addColumn(vaultEntries, vaultEntries.lastPwnedCheck);
+      }
+      if (from < 3) {
+        await m.addColumn(vaultEntries, vaultEntries.passwordMac);
       }
     },
   );
