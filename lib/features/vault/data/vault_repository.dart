@@ -30,6 +30,8 @@ class VaultRepository {
               username: r.username,
               url: r.url,
               breached: r.breached,
+              pwnedCount: r.pwnedCount,
+              lastPwnedCheck: r.lastPwnedCheck,
             ))
         .toList();
   }
@@ -39,6 +41,7 @@ class VaultRepository {
     required String username,
     required String password,
     String? url,
+    int? pwnedCount,
   }) async {
     final key = _requireVaultKey();
 
@@ -52,6 +55,9 @@ class VaultRepository {
             url: Value(url),
             passwordCipher: Uint8List.fromList(enc.cipherText),
             passwordNonce: Uint8List.fromList(enc.nonce),
+            breached: Value((pwnedCount ?? 0) > 0),
+            pwnedCount: Value(pwnedCount),
+            lastPwnedCheck: Value(pwnedCount == null ? null : DateTime.now()),
           ),
         );
   }
@@ -71,6 +77,20 @@ class VaultRepository {
     return utf8.decode(plainBytes);
   }
 
+  Future<void> setPwnedResult({
+    required int entryId,
+    required int pwnedCount,
+  }) async {
+    await (_db.update(_db.vaultEntries)..where((t) => t.id.equals(entryId))).write(
+      VaultEntriesCompanion(
+        pwnedCount: Value(pwnedCount),
+        lastPwnedCheck: Value(DateTime.now()),
+        breached: Value(pwnedCount > 0),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   Stream<List<VaultEntry>> watchEntries() {
     final query = (_db.select(_db.vaultEntries)
       ..orderBy([(t) => OrderingTerm.desc(t.updatedAt)]))
@@ -79,11 +99,13 @@ class VaultRepository {
     return query.map(
           (rows) => rows
           .map((r) => VaultEntry(
-        id: r.id,
-        title: r.title,
-        username: r.username,
-        url: r.url,
-        breached: r.breached,
+            id: r.id,
+            title: r.title,
+            username: r.username,
+            url: r.url,
+            breached: r.breached,
+            pwnedCount: r.pwnedCount,
+            lastPwnedCheck: r.lastPwnedCheck,
       ))
           .toList(),
     );
@@ -96,6 +118,8 @@ class VaultEntry {
   final String? username;
   final String? url;
   final bool breached;
+  final int? pwnedCount;
+  final DateTime? lastPwnedCheck;
 
   VaultEntry({
     required this.id,
@@ -103,5 +127,7 @@ class VaultEntry {
     required this.username,
     required this.url,
     required this.breached,
+    required this.pwnedCount,
+    required this.lastPwnedCheck,
   });
 }

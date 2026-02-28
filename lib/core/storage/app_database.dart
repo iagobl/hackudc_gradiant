@@ -10,14 +10,17 @@ class VaultEntries extends Table {
   TextColumn get username => text().nullable()();
   TextColumn get url => text().nullable()();
 
-  BlobColumn get passwordCipher => blob()(); // ciphertext+tag
-  BlobColumn get passwordNonce => blob()();  // 12 bytes
+  BlobColumn get passwordCipher => blob()();
+  BlobColumn get passwordNonce => blob()();
 
   BoolColumn get breached => boolean().withDefault(const Constant(false))();
   DateTimeColumn get lastBreachCheck => dateTime().nullable()();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  IntColumn get pwnedCount => integer().nullable()();
+  DateTimeColumn get lastPwnedCheck => dateTime().nullable()();
 }
 
 @DriftDatabase(tables: [VaultEntries])
@@ -25,5 +28,18 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) async {
+      await m.createAll();
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(vaultEntries, vaultEntries.pwnedCount);
+        await m.addColumn(vaultEntries, vaultEntries.lastPwnedCheck);
+      }
+    },
+  );
 }

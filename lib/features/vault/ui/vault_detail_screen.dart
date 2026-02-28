@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../data/vault_repository.dart';
+import '../../../core/security/pwned_passwords_service.dart';
 
 class VaultDetailScreen extends StatefulWidget {
   const VaultDetailScreen({
@@ -20,10 +21,35 @@ class VaultDetailScreen extends StatefulWidget {
 class _VaultDetailScreenState extends State<VaultDetailScreen> {
   bool _revealed = false;
   bool _loadingPw = false;
-  String? _password; // solo en memoria
+  String? _password;
   String? _error;
 
+  bool _checking = false;
+
   Timer? _clipboardTimer;
+
+  late final PwnedPasswordsService _pwned = PwnedPasswordsService();
+
+  Future<void> _showCenterMessage({
+    required String title,
+    required String message,
+    bool isError = false,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _loadPasswordIfNeeded() async {
     if (_password != null) return;
@@ -57,7 +83,6 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
 
     await Clipboard.setData(ClipboardData(text: pw));
 
-    // Borrado automático del portapapeles a los 30s
     _clipboardTimer?.cancel();
     _clipboardTimer = Timer(const Duration(seconds: 30), () async {
       final current = await Clipboard.getData('text/plain');
@@ -67,16 +92,57 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
     });
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Copiada. Se borrará del portapapeles en 30s.')),
-    );
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(const SnackBar(content: Text('Copiada. Se borrará del portapapeles en 30s.')));
+  }
+
+  Future<void> _checkPwned() async {
+    if (_checking) return;
+
+    setState(() => _checking = true);
+    try {
+      await _loadPasswordIfNeeded();
+      final pw = _password;
+      if (pw == null) {
+        await _showCenterMessage(
+          title: 'No disponible',
+          message: 'No se pudo acceder a la contraseña para comprobarla.',
+          isError: true,
+        );
+        return;
+      }
+
+      final count = await _pwned.getPwnCount(pw);
+
+      await widget.repo.setPwnedResult(entryId: widget.entry.id, pwnedCount: count);
+
+      if (!mounted) return;
+
+      await _showCenterMessage(
+        title: count > 0 ? 'Contraseña comprometida' : 'Contraseña no encontrada',
+        message: count > 0
+            ? 'Se ha visto $count veces en filtraciones.\n\nRecomendación: cámbiala cuanto antes.'
+            : 'No aparece en filtraciones conocidas.',
+        isError: count > 0,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      await _showCenterMessage(
+        title: 'No se pudo comprobar',
+        message: e.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
   }
 
   @override
   void dispose() {
     _clipboardTimer?.cancel();
-    // Limpieza defensiva
     _password = null;
+    _pwned.dispose();
     super.dispose();
   }
 
@@ -126,10 +192,9 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
 
             const SizedBox(height: 12),
 
-            if (_error != null)
-              Text(_error!, style: const TextStyle(color: Colors.red)),
+            if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
 
-            const Spacer(),
+            const SizedBox(height: 16),
 
             FilledButton.icon(
               onPressed: _copyToClipboard,
@@ -141,7 +206,17 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
+
+            OutlinedButton.icon(
+              onPressed: _checking ? null : _checkPwned,
+              icon: _checking
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.security),
+              label: const Text('Comprobar filtración'),
+            ),
+
+            const Spacer(),
           ],
         ),
       ),
