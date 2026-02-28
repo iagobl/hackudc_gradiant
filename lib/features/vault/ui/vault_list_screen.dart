@@ -26,7 +26,7 @@ class _VaultListScreenState extends State<VaultListScreen> {
   void initState() {
     super.initState();
 
-    _repo = VaultRepository(AppDatabase());
+    _repo = VaultRepository(AppDatabase.instance);
 
     _controller = VaultListController(repo: _repo);
 
