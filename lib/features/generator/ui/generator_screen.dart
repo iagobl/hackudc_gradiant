@@ -59,7 +59,6 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
       for (int i = 0; i < count; i++) {
         if (filtered.isNotEmpty) {
-          // Usamos el nuevo nextInt con entropía mezclada
           chars.add(filtered[_crypto.nextInt(filtered.length)]);
         }
       }
@@ -72,7 +71,6 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
       chars.add(alphabet[_crypto.nextInt(alphabet.length)]);
     }
 
-    // Barajado final (Shuffle) usando también entropía endurecida
     for (int i = chars.length - 1; i > 0; i--) {
       int j = _crypto.nextInt(i + 1);
       var temp = chars[i];
@@ -127,12 +125,6 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Generador endurecido con entropía acumulativa (SO + Tiempo + Hash).',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 16),
-
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -180,7 +172,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                     Slider(
                       value: _length.toDouble(),
                       min: 8,
-                      max: 64, // Aumentado a 64 para máxima seguridad
+                      max: 64,
                       divisions: 56,
                       label: '$_length',
                       onChanged: (v) => setState(() => _length = v.round()),
