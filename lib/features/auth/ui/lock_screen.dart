@@ -3,6 +3,7 @@ import 'package:local_auth/local_auth.dart';
 import '../../../core/security/vault_bootstrap_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../vault/ui/vault_list_screen.dart';
+import '../../../app/home_shell.dart';
 
 class LockScreen extends StatefulWidget {
   const LockScreen({super.key});
@@ -74,7 +75,7 @@ class _LockScreenState extends State<LockScreen> {
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const VaultListScreen()),
+        MaterialPageRoute(builder: (_) => const HomeShell(initialIndex: 0)),
       );
     } catch (_) {
       setState(() => _error = 'Clave incorrecta o vault dañado.');

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/security/vault_bootstrap_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../vault/ui/vault_list_screen.dart';
+import '../../../app/home_shell.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
@@ -49,7 +50,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const VaultListScreen()),
+        MaterialPageRoute(builder: (_) => const HomeShell(initialIndex: 0)),
       );
     } catch (e) {
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
