@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../core/security/crypto_service.dart';
+
+import '../data/generator_controller.dart';
 
 class GeneratorScreen extends StatefulWidget {
   const GeneratorScreen({super.key});
@@ -10,102 +11,29 @@ class GeneratorScreen extends StatefulWidget {
 }
 
 class _GeneratorScreenState extends State<GeneratorScreen> {
-  final _crypto = CryptoService();
+  late final GeneratorController _c;
 
-  int _length = 16;
-  bool _lower = true;
-  bool _upper = true;
-  bool _digits = true;
-  bool _symbols = true;
-  bool _avoidAmbiguous = true;
-  int _minDigits = 1;
-  int _minSymbols = 1;
-
-  String _generated = '';
-
-  static const _lowerChars = 'abcdefghijklmnopqrstuvwxyz';
-  static const _upperChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  static const _digitChars = '0123456789';
-  static const _symbolChars = r'!@#$%^&*()-_=+[]{};:,.<>?';
-
-  static const _ambiguous = 'O0Il1';
-
-  String _buildAlphabet() {
-    var s = '';
-    if (_lower) s += _lowerChars;
-    if (_upper) s += _upperChars;
-    if (_digits) s += _digitChars;
-    if (_symbols) s += _symbolChars;
-
-    if (_avoidAmbiguous) {
-      s = s.split('').where((c) => !_ambiguous.contains(c)).join();
-    }
-    return s;
+  @override
+  void initState() {
+    super.initState();
+    _c = GeneratorController();
+    _c.addListener(_onChanged);
   }
 
-  String _generate() {
-    final alphabet = _buildAlphabet();
-    if (alphabet.isEmpty) return '';
-
-    final chars = <String>[];
-
-    void addFrom(String source, int count) {
-      final filtered = _avoidAmbiguous
-          ? source.split('').where((c) => !_ambiguous.contains(c)).join()
-          : source;
-
-      for (int i = 0; i < count; i++) {
-        if (filtered.isNotEmpty) {
-          chars.add(filtered[_crypto.nextInt(filtered.length)]);
-        }
-      }
-    }
-
-    if (_digits) addFrom(_digitChars, _minDigits);
-    if (_symbols) addFrom(_symbolChars, _minSymbols);
-
-    while (chars.length < _length) {
-      chars.add(alphabet[_crypto.nextInt(alphabet.length)]);
-    }
-
-    if (chars.length > _length) {
-      chars.removeRange(_length, chars.length);
-    }
-
-    for (int i = chars.length - 1; i > 0; i--) {
-      int j = _crypto.nextInt(i + 1);
-      var temp = chars[i];
-      chars[i] = chars[j];
-      chars[j] = temp;
-    }
-
-    return chars.join();
+  void _onChanged() {
+    if (mounted) setState(() {});
   }
 
-  int _strengthScore(String pw) {
-    int score = 0;
-    if (pw.isEmpty) return 0;
-    score += (pw.length >= 8) ? 15 : 0;
-    score += (pw.length >= 12) ? 25 : 0;
-    score += (pw.length >= 16) ? 25 : 0;
-    score += RegExp(r'[a-z]').hasMatch(pw) ? 10 : 0;
-    score += RegExp(r'[A-Z]').hasMatch(pw) ? 10 : 0;
-    score += RegExp(r'\d').hasMatch(pw) ? 10 : 0;
-    score += RegExp(r'[^A-Za-z0-9]').hasMatch(pw) ? 10 : 0;
-    if (score > 100) score = 100;
-    return score;
-  }
-
-  String _strengthLabel(int score) {
-    if (score >= 80) return 'Muy fuerte';
-    if (score >= 60) return 'Fuerte';
-    if (score >= 40) return 'Media';
-    return 'Débil';
+  @override
+  void dispose() {
+    _c.removeListener(_onChanged);
+    _c.dispose();
+    super.dispose();
   }
 
   Future<void> _copy() async {
-    if (_generated.isEmpty) return;
-    await Clipboard.setData(ClipboardData(text: _generated));
+    if (_c.generated.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: _c.generated));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Contraseña copiada al portapapeles')),
@@ -114,13 +42,20 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final score = _generated.isEmpty ? 0 : _strengthScore(_generated);
+    final score = _c.strengthScore;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Generar contraseña', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Generar contraseña',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
       body: SafeArea(
         child: Column(
@@ -131,11 +66,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Generador endurecido con entropía acumulativa.',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -147,12 +78,16 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                         children: [
                           Expanded(
                             child: SelectableText(
-                              _generated.isEmpty ? 'Pulsa "Generar"' : _generated,
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                              _c.generated.isEmpty ? 'Pulsa "Generar"' : _c.generated,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
                             ),
                           ),
                           IconButton(
-                            onPressed: _generated.isEmpty ? null : _copy,
+                            onPressed: _c.generated.isEmpty ? null : _copy,
                             icon: const Icon(Icons.copy),
                             tooltip: 'Copiar',
                           ),
@@ -171,68 +106,50 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text(_strengthLabel(score), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(_c.strengthLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
 
                     const SizedBox(height: 24),
 
                     Text(
-                      'Longitud: $_length',
+                      'Longitud: ${_c.length}',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     Slider(
-                      value: _length.toDouble(),
+                      value: _c.length.toDouble(),
                       min: 8,
                       max: 64,
                       divisions: 56,
-                      label: '$_length',
-                      onChanged: (v) {
-                        setState(() {
-                          _length = v.round();
-                          // AJUSTE DINÁMICO: Si el largo es menor a los mínimos requeridos, reducimos los mínimos.
-                          while (_minDigits + _minSymbols > _length) {
-                            if (_minSymbols > 0) {
-                              _minSymbols--;
-                            } else if (_minDigits > 0) {
-                              _minDigits--;
-                            }
-                          }
-                        });
-                      },
+                      label: '${_c.length}',
+                      onChanged: (v) => _c.setLength(v.round()),
                     ),
 
                     const SizedBox(height: 12),
 
                     SwitchListTile(
-                      value: _upper,
-                      onChanged: (v) => setState(() => _upper = v),
+                      value: _c.upper,
+                      onChanged: _c.setUpper,
                       title: const Text('Incluir mayúsculas'),
                     ),
                     SwitchListTile(
-                      value: _lower,
-                      onChanged: (v) => setState(() => _lower = v),
+                      value: _c.lower,
+                      onChanged: _c.setLower,
                       title: const Text('Incluir minúsculas'),
                     ),
                     SwitchListTile(
-                      value: _digits,
-                      onChanged: (v) => setState(() {
-                        _digits = v;
-                        if (!v) _minDigits = 0;
-                      }),
+                      value: _c.digits,
+                      onChanged: _c.setDigits,
                       title: const Text('Incluir números'),
                     ),
                     SwitchListTile(
-                      value: _symbols,
-                      onChanged: (v) => setState(() {
-                        _symbols = v;
-                        if (!v) _minSymbols = 0;
-                      }),
+                      value: _c.symbols,
+                      onChanged: _c.setSymbols,
                       title: const Text('Incluir símbolos'),
                     ),
                     SwitchListTile(
-                      value: _avoidAmbiguous,
-                      onChanged: (v) => setState(() => _avoidAmbiguous = v),
+                      value: _c.avoidAmbiguous,
+                      onChanged: _c.setAvoidAmbiguous,
                       title: const Text('Evitar caracteres confusos'),
                     ),
 
@@ -245,28 +162,18 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
                     _MinSelector(
                       label: 'Mínimo números',
-                      value: _minDigits,
-                      enabled: _digits,
-                      onMinus: () => setState(() => _minDigits = _minDigits > 0 ? _minDigits - 1 : 0),
-                      onPlus: () {
-                        // REGLA: No permitir que la suma supere el largo total
-                        if (_digits && (_minDigits + _minSymbols < _length)) {
-                          setState(() => _minDigits++);
-                        }
-                      },
+                      value: _c.minDigits,
+                      enabled: _c.digits,
+                      onMinus: _c.decMinDigits,
+                      onPlus: _c.incMinDigits,
                     ),
 
                     _MinSelector(
                       label: 'Mínimo símbolos',
-                      value: _minSymbols,
-                      enabled: _symbols,
-                      onMinus: () => setState(() => _minSymbols = _minSymbols > 0 ? _minSymbols - 1 : 0),
-                      onPlus: () {
-                        // REGLA: No permitir que la suma supere el largo total
-                        if (_symbols && (_minDigits + _minSymbols < _length)) {
-                          setState(() => _minSymbols++);
-                        }
-                      },
+                      value: _c.minSymbols,
+                      enabled: _c.symbols,
+                      onMinus: _c.decMinSymbols,
+                      onPlus: _c.incMinSymbols,
                     ),
 
                     const SizedBox(height: 12),
@@ -278,7 +185,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: FilledButton(
-                onPressed: () => setState(() => _generated = _generate()),
+                onPressed: _c.generate,
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
                   textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -321,7 +228,11 @@ class _MinSelector extends StatelessWidget {
           ),
           SizedBox(
             width: 30,
-            child: Text(value.toString(), textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            child: Text(
+              value.toString(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
           IconButton(
             onPressed: enabled ? onPlus : null,
