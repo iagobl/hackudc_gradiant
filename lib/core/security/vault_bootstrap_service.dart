@@ -23,41 +23,56 @@ class VaultBootstrapService {
   static const _kCiphertextKEM = 'vault_ciphertextKEM_b64';
   static const _kPrivateKey = 'vault_privateKey_b64';
   static const _kPublicKey = 'vault_publicKey_b64';
-  static const _kIters = 'kdf_iters';
-  static const _kWrappedVaultKey = 'vault_key_wrapped_b64';
-  static const _kWrappedVaultKeyNonce = 'vault_key_wrapped_nonce_b64';
   static const _kBioVaultKey = 'bio_vault_key_b64';
+  static const _kBioEnabled = 'vault_bio_enabled';
+
+  static const _verifierSecret = 'VAULT_VERIFIER_TOKEN';
 
   Future<bool> isBiometricsAvailable() async {
     final can = await BiometricStorage().canAuthenticate();
     return can == CanAuthenticateResponse.success;
   }
 
-  static const _verifierSecret = 'VAULT_VERIFIER_TOKEN';
-
   Future<void> enableBiometrics() async {
-    final key = VaultState.key;
-    if (key == null) {
+    final state = VaultState.instance;
+    if (state == null) {
       throw StateError('Vault debe estar desbloqueado para activar biometría');
     }
 
-    final bytes = await key.extractBytes();
+    final bytes = await state.dek.extractBytes();
     final b64 = base64Encode(bytes);
 
     final storage = await BiometricStorage().getStorage(
       _kBioVaultKey,
-      options:  StorageFileInitOptions(
+      options: StorageFileInitOptions(
         authenticationRequired: true,
       ),
     );
 
     await storage.write(b64);
+    await _storage.writeString(_kBioEnabled, 'true');
+  }
+
+  Future<void> disableBiometrics() async {
+    final storage = await BiometricStorage().getStorage(
+      _kBioVaultKey,
+      options: StorageFileInitOptions(
+        authenticationRequired: true,
+      ),
+    );
+    await storage.delete();
+    await _storage.delete(_kBioEnabled);
+  }
+
+  Future<bool> isBiometricsEnabled() async {
+    final enabled = await _storage.readString(_kBioEnabled);
+    return enabled == 'true';
   }
 
   Future<void> unlockVaultWithBiometrics() async {
     final storage = await BiometricStorage().getStorage(
       _kBioVaultKey,
-      options:  StorageFileInitOptions(
+      options: StorageFileInitOptions(
         authenticationRequired: true,
       ),
     );
@@ -71,19 +86,51 @@ class VaultBootstrapService {
     VaultState.set(SecretKey(bytes));
   }
 
-  Future<bool> isBiometricsEnabled() async {
-    final storage = await BiometricStorage().getStorage(
-      _kBioVaultKey,
-      options: StorageFileInitOptions(authenticationRequired: true),
+  Future<void> changeMasterPassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    await unlockVault(masterPassword: oldPassword);
+    
+    final state = VaultState.instance;
+    if (state == null) throw Exception('Error al validar contraseña actual');
+
+    final newSalt = Uint8List.fromList(List.generate(16, (_) => Random.secure().nextInt(256)));
+
+    final newKek = await _kdf.deriveKEK(masterPassword: newPassword, salt: newSalt);
+
+    final pqcResult = await _crypto.wrapDEKPostQuantum(
+      dek: state.dek,
+      kemName: 'ML-KEM-768',
     );
-    final v = await storage.read();
-    return v != null;
+
+    final newCipherDEK = await _crypto.encryptWithKEK(
+      plain: pqcResult['cipherDEK']!,
+      kek: newKek,
+    );
+
+    final newVerifier = await _crypto.encryptWithKEK(
+      plain: Uint8List.fromList(utf8.encode(_verifierSecret)),
+      kek: newKek,
+    );
+
+    await _storage.writeString(_kSalt, base64Encode(newSalt));
+    await _storage.writeString(_kVerifier, base64Encode(newVerifier));
+    await _storage.writeString(_kCipherDEK, base64Encode(newCipherDEK));
+    await _storage.writeString(_kCiphertextKEM, base64Encode(pqcResult['ciphertextKEM']!));
+    await _storage.writeString(_kPrivateKey, base64Encode(pqcResult['privateKey']!));
+    await _storage.writeString(_kPublicKey, base64Encode(pqcResult['publicKey']!));
+
+    if (await isBiometricsEnabled()) {
+      await enableBiometrics();
+    }
   }
 
   Future<void> createVault({required String masterPassword}) async {
     final salt = Uint8List.fromList(List.generate(16, (_) => Random.secure().nextInt(256)));
     final kek = await _kdf.deriveKEK(masterPassword: masterPassword, salt: salt);
     final dek = await _crypto.generateDEK();
+    
     final pqcResult = await _crypto.wrapDEKPostQuantum(
       dek: dek,
       kemName: 'ML-KEM-768',
@@ -118,7 +165,7 @@ class VaultBootstrapService {
 
     if (saltStr == null || verifierStr == null || cipherDEKStr == null ||
         ciphertextKEMStr == null || privateKeyStr == null) {
-      throw Exception('Vault not initialized or data missing');
+      throw Exception('Vault no inicializado');
     }
 
     final salt = base64Decode(saltStr);
@@ -164,13 +211,6 @@ class VaultBootstrapService {
     final salt = await _storage.readString(_kSalt);
     final verifier = await _storage.readString(_kVerifier);
     final cipherDEK = await _storage.readString(_kCipherDEK);
-    final ciphertextKEM = await _storage.readString(_kCiphertextKEM);
-    final privKey = await _storage.readString(_kPrivateKey);
-
-    return salt != null &&
-           verifier != null &&
-           cipherDEK != null &&
-           ciphertextKEM != null &&
-           privKey != null;
+    return salt != null && verifier != null && cipherDEK != null;
   }
 }
