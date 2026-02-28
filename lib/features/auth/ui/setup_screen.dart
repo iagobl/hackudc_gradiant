@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/security/vault_bootstrap_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
-import '../../vault/ui/vault_list_screen.dart';
 import '../../../app/home_shell.dart';
 
 class SetupScreen extends StatefulWidget {
@@ -14,6 +13,7 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> {
   final _pw1 = TextEditingController();
   final _pw2 = TextEditingController();
+
   bool _busy = false;
   String? _error;
 
@@ -24,6 +24,26 @@ class _SetupScreenState extends State<SetupScreen> {
     final hasDigit = RegExp(r'\d').hasMatch(s);
     final hasSymbol = RegExp(r'[^A-Za-z0-9]').hasMatch(s);
     return hasLower && hasUpper && hasDigit && hasSymbol;
+  }
+
+  Future<void> _showCenterMessage({
+    required String title,
+    required String message,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _create() async {
@@ -48,6 +68,14 @@ class _SetupScreenState extends State<SetupScreen> {
       final service = VaultBootstrapService(SecureStorageService());
       await service.createVault(masterPassword: a);
 
+      try {
+        final available = await service.isBiometricsAvailable();
+        if (available) {
+          await service.enableBiometrics();
+        }
+      } catch (_) {
+      }
+
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const HomeShell(initialIndex: 0)),
@@ -69,45 +97,64 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(title: const Text('Crear Vault')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
         child: Column(
           children: [
-            const Text(
-              'Crea una clave maestra (alfanumérica) para cifrar el vault en este dispositivo.',
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _pw1,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Clave maestra',
-                helperText:
-                'Mín. 12 chars, mayúscula, minúscula, número y símbolo.',
+            Expanded(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Crea una clave maestra para cifrar el vault en este dispositivo.',
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _pw1,
+                      obscureText: true,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Clave maestra',
+                        helperText:
+                        'Mín. 12 chars, mayúscula, minúscula, número y símbolo.',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _pw2,
+                      obscureText: true,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _busy ? null : _create(),
+                      decoration: const InputDecoration(
+                        labelText: 'Repetir clave maestra',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_error != null)
+                      Text(_error!, style: const TextStyle(color: Colors.red)),
+                    const SizedBox(height: 24),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _pw2,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Repetir clave maestra',
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (_error != null)
-              Text(_error!, style: const TextStyle(color: Colors.red)),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _busy ? null : _create,
-                child: _busy
-                    ? const SizedBox(
-                  width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : const Text('Crear vault'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _busy ? null : _create,
+                  child: _busy
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                      : const Text('Crear vault'),
+                ),
               ),
             ),
           ],

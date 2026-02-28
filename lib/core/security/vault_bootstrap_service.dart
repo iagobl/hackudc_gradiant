@@ -2,10 +2,13 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:cryptography/cryptography.dart';
+
 import '../storage/secure_storage_service.dart';
 import 'crypto_service.dart';
 import 'kdf_service.dart';
 import 'vault_state.dart';
+import 'package:biometric_storage/biometric_storage.dart';
 
 class VaultBootstrapService {
   VaultBootstrapService(this._storage);
@@ -20,10 +23,63 @@ class VaultBootstrapService {
   static const _kCiphertextKEM = 'vault_ciphertextKEM_b64';
   static const _kPrivateKey = 'vault_privateKey_b64';
   static const _kPublicKey = 'vault_publicKey_b64';
+  static const _kIters = 'kdf_iters';
+  static const _kWrappedVaultKey = 'vault_key_wrapped_b64';
+  static const _kWrappedVaultKeyNonce = 'vault_key_wrapped_nonce_b64';
+  static const _kBioVaultKey = 'bio_vault_key_b64';
+
+  Future<bool> isBiometricsAvailable() async {
+    final can = await BiometricStorage().canAuthenticate();
+    return can == CanAuthenticateResponse.success;
+  }
 
   static const _verifierSecret = 'VAULT_VERIFIER_TOKEN';
 
-  /// SETUP INICIAL: Crea el vault con esquema híbrido (Clásico + PQC)
+  Future<void> enableBiometrics() async {
+    final key = VaultState.key;
+    if (key == null) {
+      throw StateError('Vault debe estar desbloqueado para activar biometría');
+    }
+
+    final bytes = await key.extractBytes();
+    final b64 = base64Encode(bytes);
+
+    final storage = await BiometricStorage().getStorage(
+      _kBioVaultKey,
+      options:  StorageFileInitOptions(
+        authenticationRequired: true,
+      ),
+    );
+
+    await storage.write(b64);
+  }
+
+  Future<void> unlockVaultWithBiometrics() async {
+    final storage = await BiometricStorage().getStorage(
+      _kBioVaultKey,
+      options:  StorageFileInitOptions(
+        authenticationRequired: true,
+      ),
+    );
+
+    final b64 = await storage.read();
+    if (b64 == null) {
+      throw StateError('Biometría no configurada');
+    }
+
+    final bytes = base64Decode(b64);
+    VaultState.set(SecretKey(bytes));
+  }
+
+  Future<bool> isBiometricsEnabled() async {
+    final storage = await BiometricStorage().getStorage(
+      _kBioVaultKey,
+      options: StorageFileInitOptions(authenticationRequired: true),
+    );
+    final v = await storage.read();
+    return v != null;
+  }
+
   Future<void> createVault({required String masterPassword}) async {
     final salt = Uint8List.fromList(List.generate(16, (_) => Random.secure().nextInt(256)));
     final kek = await _kdf.deriveKEK(masterPassword: masterPassword, salt: salt);
@@ -60,7 +116,7 @@ class VaultBootstrapService {
     final ciphertextKEMStr = await _storage.readString(_kCiphertextKEM);
     final privateKeyStr = await _storage.readString(_kPrivateKey);
 
-    if (saltStr == null || verifierStr == null || cipherDEKStr == null || 
+    if (saltStr == null || verifierStr == null || cipherDEKStr == null ||
         ciphertextKEMStr == null || privateKeyStr == null) {
       throw Exception('Vault not initialized or data missing');
     }
@@ -110,11 +166,11 @@ class VaultBootstrapService {
     final cipherDEK = await _storage.readString(_kCipherDEK);
     final ciphertextKEM = await _storage.readString(_kCiphertextKEM);
     final privKey = await _storage.readString(_kPrivateKey);
-    
-    return salt != null && 
-           verifier != null && 
-           cipherDEK != null && 
-           ciphertextKEM != null && 
+
+    return salt != null &&
+           verifier != null &&
+           cipherDEK != null &&
+           ciphertextKEM != null &&
            privKey != null;
   }
 }

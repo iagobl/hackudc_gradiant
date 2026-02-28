@@ -6,7 +6,12 @@ class VaultState {
   final SecretKey dek;
 
   static VaultState? _instance;
+
   static VaultState? get instance => _instance;
+
+  static SecretKey? get key => _instance?.dek;
+
+  static bool get isUnlocked => _instance != null;
 
   static void set(SecretKey dek) {
     _instance = VaultState._(dek);
@@ -15,6 +20,4 @@ class VaultState {
   static void clear() {
     _instance = null;
   }
-
-  static bool get isUnlocked => _instance != null;
 }
