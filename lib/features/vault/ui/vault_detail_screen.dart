@@ -1,13 +1,11 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/storage/app_database.dart';
-import '../../../core/security/vault_state.dart';
 import '../../../core/security/vault_bootstrap_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
-import '../../../core/security/pwned_passwords_service.dart';
+import '../data/vault_detail_controller.dart';
 import '../data/vault_repository.dart';
 
 class VaultDetailScreen extends StatefulWidget {
@@ -27,28 +25,24 @@ class VaultDetailScreen extends StatefulWidget {
 class _VaultDetailScreenState extends State<VaultDetailScreen> {
   static const Color _accentBlue = Color(0xFF2563EB);
 
-  bool _editing = false;
-  bool _revealed = false;
-  bool _loadingPw = false;
-  bool _checking = false;
-  bool _saving = false;
-
-  String? _password;
-  String? _error;
-
   final _titleController = TextEditingController();
   final _userController = TextEditingController();
   final _urlController = TextEditingController();
   final _passController = TextEditingController();
 
-  Timer? _clipboardTimer;
-  late final PwnedPasswordsService _pwned = PwnedPasswordsService();
   final _bootstrap = VaultBootstrapService(SecureStorageService());
+  late final VaultDetailController _c;
 
   @override
   void initState() {
     super.initState();
+    _c = VaultDetailController(repo: widget.repo);
+    _c.addListener(_onChanged);
     _initControllers(widget.entry);
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
   }
 
   void _initControllers(VaultEntry e) {
@@ -64,8 +58,9 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
     _userController.dispose();
     _urlController.dispose();
     _passController.dispose();
-    _clipboardTimer?.cancel();
-    _pwned.dispose();
+    _c.removeListener(_onChanged);
+    _c.disposeController();
+    _c.dispose();
     super.dispose();
   }
 
@@ -285,10 +280,11 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
 
     if (confirm != true) return;
 
-    final authenticated = await _authenticateWithMasterPassword();
-    if (!authenticated) return;
-
-    await widget.repo.deleteEntry(e.id);
+    final deleted = await _c.deleteEntry(
+      e,
+      authenticate: _authenticateWithMasterPassword,
+    );
+    if (!deleted) return;
 
     if (!mounted) return;
     Navigator.pop(context);
@@ -297,35 +293,14 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
     );
   }
 
-  Future<void> _loadPasswordIfNeeded(VaultEntry e) async {
-    if (_password != null) return;
-    if (e.requireMasterPassword) {
-      if (!await _authenticateWithMasterPassword()) return;
-    }
-
-    setState(() {
-      _loadingPw = true;
-      _error = null;
-    });
-
-    try {
-      final dek = VaultState.instance?.dek;
-      if (dek == null) throw 'Vault bloqueado';
-
-      final pw = await widget.repo.decryptPassword(e.id, dek);
-      if (mounted) setState(() => _password = pw);
-    } catch (_) {
-      if (mounted) setState(() => _error = 'No se pudo descifrar');
-    } finally {
-      if (mounted) setState(() => _loadingPw = false);
-    }
-  }
-
   Future<void> _copyPassword(VaultEntry e) async {
-    await _loadPasswordIfNeeded(e);
-    if (_password == null) return;
+    final ok = await _c.ensurePasswordForCopy(
+      e,
+      authenticateIfNeeded: _authenticateWithMasterPassword,
+    );
+    if (!ok || _c.password == null) return;
 
-    await Clipboard.setData(ClipboardData(text: _password!));
+    await Clipboard.setData(ClipboardData(text: _c.password!));
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -334,37 +309,29 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
   }
 
   Future<void> _checkPwned(VaultEntry e) async {
-    await _loadPasswordIfNeeded(e);
-    if (_password == null) return;
+    final count = await _c.checkPwned(
+      e,
+      authenticateIfNeeded: _authenticateWithMasterPassword,
+    );
+    if (count == null) return;
 
-    setState(() => _checking = true);
-    try {
-      final count = await _pwned.getPwnCount(_password!);
-      await widget.repo.setPwnedResult(entryId: e.id, pwnedCount: count);
-
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: Text(count > 0 ? 'Contraseña comprometida' : 'Contraseña segura'),
-          content: Text(
-            count > 0 ? 'Aparece $count veces en filtraciones.' : 'No se han encontrado filtraciones.',
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
-          ],
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(count > 0 ? 'Contraseña comprometida' : 'Contraseña segura'),
+        content: Text(
+          count > 0 ? 'Aparece $count veces en filtraciones.' : 'No se han encontrado filtraciones.',
         ),
-      );
-    } finally {
-      if (mounted) setState(() => _checking = false);
-    }
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+        ],
+      ),
+    );
   }
 
   Future<void> _saveChanges(VaultEntry current) async {
-    if (_saving) return;
-
-    final dek = VaultState.instance?.dek;
-    if (dek == null) return;
+    if (_c.saving) return;
 
     if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -373,37 +340,27 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
       return;
     }
 
-    final authenticated = await _authenticateWithMasterPassword();
-    if (!authenticated) return;
+    final newPw = _passController.text.isNotEmpty ? _passController.text : null;
 
-    setState(() => _saving = true);
-    try {
-      await widget.repo.updateEntry(
-        id: current.id,
-        title: _titleController.text.trim(),
-        username: _userController.text.trim(),
-        url: _urlController.text.trim(),
-        password: _passController.text.isNotEmpty ? _passController.text : null,
-        dek: _passController.text.isNotEmpty ? dek : null,
-      );
+    final ok = await _c.saveChanges(
+      current,
+      title: _titleController.text.trim(),
+      username: _userController.text.trim(),
+      url: _urlController.text.trim(),
+      newPassword: newPw,
+      authenticate: _authenticateWithMasterPassword,
+    );
 
-      if (!mounted) return;
-      setState(() {
-        _editing = false;
-        _password = null;
-        _revealed = false;
-      });
+    if (!mounted) return;
 
+    if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cambios guardados')),
       );
-    } catch (e) {
-      if (!mounted) return;
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        const SnackBar(content: Text('Error al guardar cambios')),
       );
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -457,10 +414,10 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
           final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
           return PopScope(
-            canPop: !_editing,
+            canPop: !_c.editing,
             onPopInvoked: (didPop) {
               if (didPop) return;
-              if (_editing) setState(() => _editing = false);
+              if (_c.editing) _c.setEditing(false);
             },
             child: Scaffold(
               appBar: AppBar(
@@ -468,20 +425,20 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                 surfaceTintColor: Theme.of(context).colorScheme.surface,
                 elevation: 0,
                 title: Text(
-                  _editing ? 'Editar entrada' : e.title,
+                  _c.editing ? 'Editar entrada' : e.title,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.2,
                   ),
                 ),
-                leading: _editing
+                leading: _c.editing
                     ? IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () => setState(() => _editing = false),
+                  onPressed: () => _c.setEditing(false),
                 )
                     : null,
                 actions: [
-                  if (!_editing) ...[
+                  if (!_c.editing) ...[
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                       onPressed: () => _deleteEntry(e),
@@ -490,7 +447,7 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                       icon: const Icon(Icons.edit_outlined),
                       onPressed: () {
                         _initControllers(e);
-                        setState(() => _editing = true);
+                        _c.setEditing(true);
                       },
                     ),
                   ],
@@ -501,7 +458,7 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_editing) ...[
+                    if (_c.editing) ...[
                       _block(
                         context,
                         child: Column(
@@ -544,10 +501,9 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 18),
-
                       FilledButton(
-                        onPressed: _saving ? null : () => _saveChanges(e),
-                        child: _saving
+                        onPressed: _c.saving ? null : () => _saveChanges(e),
+                        child: _c.saving
                             ? const SizedBox(
                           width: 22,
                           height: 22,
@@ -572,7 +528,6 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-
                       _block(
                         context,
                         child: Column(
@@ -581,24 +536,22 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                             _readField(
                               context: context,
                               label: 'Contraseña',
-                              value: _loadingPw
+                              value: _c.loadingPw
                                   ? 'Cargando...'
-                                  : (_revealed ? (_password ?? '') : '••••••••••••'),
+                                  : (_c.revealed ? (_c.password ?? '') : '••••••••••••'),
                               trailing: IconButton(
-                                tooltip: _revealed ? 'Ocultar' : 'Mostrar',
-                                onPressed: () async {
-                                  if (!_revealed) await _loadPasswordIfNeeded(e);
-                                  if (_password != null) {
-                                    setState(() => _revealed = !_revealed);
-                                  }
-                                },
-                                icon: Icon(_revealed ? Icons.visibility_off : Icons.visibility),
+                                tooltip: _c.revealed ? 'Ocultar' : 'Mostrar',
+                                onPressed: () => _c.toggleReveal(
+                                  e,
+                                  authenticateIfNeeded: _authenticateWithMasterPassword,
+                                ),
+                                icon: Icon(_c.revealed ? Icons.visibility_off : Icons.visibility),
                               ),
                             ),
-                            if (_error != null) ...[
+                            if (_c.error != null) ...[
                               const SizedBox(height: 10),
                               Text(
-                                _error!,
+                                _c.error!,
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.error,
                                   fontWeight: FontWeight.w700,
@@ -610,14 +563,14 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 _smallOutlinedButton(
-                                  onPressed: _loadingPw ? null : () => _copyPassword(e),
+                                  onPressed: _c.loadingPw ? null : () => _copyPassword(e),
                                   icon: const Icon(Icons.copy, size: 18),
                                   label: 'Copiar',
                                 ),
                                 const SizedBox(width: 10),
                                 _smallOutlinedButton(
-                                  onPressed: (_checking || _loadingPw) ? null : () => _checkPwned(e),
-                                  icon: _checking
+                                  onPressed: (_c.checking || _c.loadingPw) ? null : () => _checkPwned(e),
+                                  icon: _c.checking
                                       ? const SizedBox(
                                     width: 16,
                                     height: 16,
@@ -631,9 +584,7 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                           ],
                         ),
                       ),
-
                       const Divider(height: 48),
-
                       _whiteCard(
                         context,
                         child: Row(
@@ -648,24 +599,17 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                             Switch(
                               value: e.requireMasterPassword,
                               onChanged: (val) async {
-                                // ✅ Pedir Clave Maestra SOLO para desactivar (pasar de Sí a No)
-                                if (val == false) {
-                                  final authenticated = await _authenticateWithMasterPassword();
-                                  if (authenticated) {
-                                    widget.repo.updateRequireMasterPassword(e.id, false);
-                                  }
-                                } else {
-                                  // Activar no requiere validación (es aumentar seguridad)
-                                  widget.repo.updateRequireMasterPassword(e.id, true);
-                                }
+                                await _c.setRequireMasterPassword(
+                                  e,
+                                  val,
+                                  authenticateIfDisabling: _authenticateWithMasterPassword,
+                                );
                               },
                             ),
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 12),
-
                       _whiteCard(
                         context,
                         child: Column(
