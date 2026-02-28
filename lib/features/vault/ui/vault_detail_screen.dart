@@ -71,7 +71,7 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
               titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-              contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+              contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

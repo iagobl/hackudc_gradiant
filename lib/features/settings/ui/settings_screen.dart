@@ -70,7 +70,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Cambiar Clave Maestra'),
+              title: const Text(
+                'Cambiar Clave Maestra',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+              contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+              actionsPadding: const EdgeInsets.fromLTRB(0, 0, 16, 8),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -97,6 +103,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ],
                         ),
                       ),
+                    const Text(
+                      'Se requiere al menos 12 caracteres, mayúsculas y símbolos.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: oldController,
@@ -104,9 +114,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onChanged: (_) => setDialogState(() => oldError = null),
                       decoration: InputDecoration(
                         labelText: 'Contraseña actual',
+                        labelStyle: const TextStyle(fontSize: 14),
                         errorText: oldError,
                         border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.lock_open),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -116,10 +126,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onChanged: (_) => setDialogState(() => newError = null),
                       decoration: InputDecoration(
                         labelText: 'Nueva contraseña',
+                        labelStyle: const TextStyle(fontSize: 14),
                         errorText: newError,
                         errorMaxLines: 3,
                         border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.new_releases_outlined),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -129,9 +139,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onChanged: (_) => setDialogState(() => confirmError = null),
                       decoration: InputDecoration(
                         labelText: 'Confirmar contraseña',
+                        labelStyle: const TextStyle(fontSize: 14),
                         errorText: confirmError,
                         border: const OutlineInputBorder(),
-                        prefixIcon: const Icon(Icons.check_circle_outline),
                       ),
                     ),
                   ],
@@ -208,8 +218,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Error al cambiar contraseña: Clave actual incorrecta'),
+            const SnackBar(
+              content: Text('Error al cambiar contraseña: Clave actual incorrecta'),
               backgroundColor: Colors.red,
             ),
           );
