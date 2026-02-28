@@ -13,8 +13,13 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _bootstrap = VaultBootstrapService(SecureStorageService());
+  final _storage = SecureStorageService();
+  
   bool _biometricsEnabled = false;
   bool _loading = true;
+  int _autoLockSeconds = 0; // 0 significa bloqueo inmediato
+
+  static const _kAutoLockKey = 'settings_auto_lock_seconds';
 
   @override
   void initState() {
@@ -23,13 +28,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final enabled = await _bootstrap.isBiometricsEnabled();
+    final bioEnabled = await _bootstrap.isBiometricsEnabled();
+    final lockStr = await _storage.readString(_kAutoLockKey);
+    final lockVal = int.tryParse(lockStr ?? '0') ?? 0;
+
     if (mounted) {
       setState(() {
-        _biometricsEnabled = enabled;
+        _biometricsEnabled = bioEnabled;
+        _autoLockSeconds = lockVal;
         _loading = false;
       });
     }
+  }
+
+  Future<void> _setAutoLock(int seconds) async {
+    await _storage.writeString(_kAutoLockKey, seconds.toString());
+    setState(() => _autoLockSeconds = seconds);
   }
 
   Future<void> _toggleBiometrics(bool value) async {
@@ -258,6 +272,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: _biometricsEnabled,
                 onChanged: _toggleBiometrics,
               ),
+              const Divider(indent: 70),
+              ListTile(
+                leading: const Icon(Icons.timer_outlined),
+                title: const Text('Tiempo de Bloqueo Automático'),
+                subtitle: Text(_getLockText(_autoLockSeconds)),
+                trailing: const Icon(Icons.arrow_drop_down),
+                onTap: _showLockTimePicker,
+              ),
               const Divider(),
               _buildSectionTitle('Información'),
               const ListTile(
@@ -274,6 +296,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
         ],
       ),
+    );
+  }
+
+  String _getLockText(int seconds) {
+    if (seconds == 0) return 'Bloqueo inmediato';
+    if (seconds == -1) return 'Nunca';
+    if (seconds < 60) return '$seconds segundos';
+    return '${seconds ~/ 60} minutos';
+  }
+
+  void _showLockTimePicker() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildLockOption('Inmediatamente', 0),
+              _buildLockOption('30 segundos', 30),
+              _buildLockOption('1 minuto', 60),
+              _buildLockOption('2 minutos', 120),
+              _buildLockOption('5 minutos', 300),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLockOption(String label, int seconds) {
+    return ListTile(
+      title: Text(label),
+      trailing: _autoLockSeconds == seconds ? const Icon(Icons.check, color: Colors.blue) : null,
+      onTap: () {
+        _setAutoLock(seconds);
+        Navigator.pop(context);
+      },
     );
   }
 
