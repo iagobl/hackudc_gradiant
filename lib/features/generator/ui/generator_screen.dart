@@ -59,6 +59,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
       for (int i = 0; i < count; i++) {
         if (filtered.isNotEmpty) {
+          // Usamos el nuevo nextInt con entropía mezclada
           chars.add(filtered[_crypto.nextInt(filtered.length)]);
         }
       }
@@ -71,6 +72,7 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
       chars.add(alphabet[_crypto.nextInt(alphabet.length)]);
     }
 
+    // Barajado final (Shuffle) usando también entropía endurecida
     for (int i = chars.length - 1; i > 0; i--) {
       int j = _crypto.nextInt(i + 1);
       var temp = chars[i];
@@ -113,9 +115,23 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
   @override
   Widget build(BuildContext context) {
     final score = _generated.isEmpty ? 0 : _strengthScore(_generated);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Generar contraseña')),
+      appBar: AppBar(
+        backgroundColor: cs.surface,
+        surfaceTintColor: cs.surface,
+        elevation: 0,
+        title: Text(
+          'Generar contraseña',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.2,
+            color: cs.onSurface,
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -125,6 +141,13 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const Text(
+                      'Generador endurecido con entropía acumulativa (SO + Tiempo + Hash).',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
