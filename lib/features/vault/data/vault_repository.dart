@@ -25,6 +25,7 @@ class VaultRepository {
     String? url,
     required SecretKey dek, 
     int? pwnedCount,
+    bool requireMasterPassword = false,
   }) async {
     final plain = Uint8List.fromList(utf8.encode(password));
     final enc = await _crypto.encrypt(plain: plain, key: dek);
@@ -37,6 +38,7 @@ class VaultRepository {
         passwordCipher: Uint8List.fromList(enc.cipherText),
         passwordNonce: Uint8List.fromList(enc.nonce),
         passwordMac: Uint8List.fromList(enc.mac.bytes),
+        requireMasterPassword: Value(requireMasterPassword),
         breached: Value((pwnedCount ?? 0) > 0),
         pwnedCount: Value(pwnedCount),
         lastPwnedCheck: Value(pwnedCount == null ? null : DateTime.now()),

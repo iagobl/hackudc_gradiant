@@ -2,6 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/security/vault_state.dart';
+import '../../../core/security/vault_bootstrap_service.dart';
+import '../../../core/security/vault_state.dart';
+import '../../../core/storage/secure_storage_service.dart';
 import '../data/vault_repository.dart';
 import '../../../core/security/pwned_passwords_service.dart';
 import '../../../core/storage/app_database.dart';
@@ -31,6 +34,7 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
   Timer? _clipboardTimer;
 
   late final PwnedPasswordsService _pwned = PwnedPasswordsService();
+  final _bootstrap = VaultBootstrapService(SecureStorageService());
 
   Future<void> _showCenterMessage({
     required String title,
@@ -53,8 +57,74 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
     );
   }
 
+  Future<bool> _authenticateWithMasterPassword() async {
+    final passwordController = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        String? dialogError;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text(
+                'Validación de Seguridad',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+              contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Clave Maestra',
+                      labelStyle: const TextStyle(fontSize: 14),
+                      errorText: dialogError,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(0, 0, 16, 8),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    try {
+                      // Intentamos desbloquear el vault con el password proporcionado
+                      // para validar que es correcto. No cambiaremos el estado global, 
+                      // solo validamos para esta acción.
+                      await _bootstrap.unlockVault(masterPassword: passwordController.text);
+                      if (context.mounted) Navigator.pop(context, true);
+                    } catch (e) {
+                      setDialogState(() => dialogError = 'Clave incorrecta');
+                    }
+                  },
+                  child: const Text('Confirmar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    return result ?? false;
+  }
+
   Future<void> _loadPasswordIfNeeded() async {
     if (_password != null) return;
+
+    // Si la entrada requiere Master Password, validamos antes de proceder
+    if (widget.entry.requireMasterPassword) {
+      final authenticated = await _authenticateWithMasterPassword();
+      if (!authenticated) return;
+    }
+
     setState(() {
       _loadingPw = true;
       _error = null;
@@ -113,11 +183,7 @@ class _VaultDetailScreenState extends State<VaultDetailScreen> {
       await _loadPasswordIfNeeded();
       final pw = _password;
       if (pw == null) {
-        await _showCenterMessage(
-          title: 'No disponible',
-          message: 'No se pudo acceder a la contraseña para comprobarla.',
-          isError: true,
-        );
+        setState(() => _checking = false);
         return;
       }
 

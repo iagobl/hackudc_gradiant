@@ -12,7 +12,9 @@ class VaultEntries extends Table {
 
   BlobColumn get passwordCipher => blob()();
   BlobColumn get passwordNonce => blob()();
-  BlobColumn get passwordMac => blob()(); // Nueva columna necesaria para AES-GCM
+  BlobColumn get passwordMac => blob()();
+
+  BoolColumn get requireMasterPassword => boolean().withDefault(const Constant(false))();
 
   BoolColumn get breached => boolean().withDefault(const Constant(false))();
   DateTimeColumn get lastBreachCheck => dateTime().nullable()();
@@ -29,7 +31,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -43,6 +45,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 3) {
         await m.addColumn(vaultEntries, vaultEntries.passwordMac);
+      }
+      if (from < 4) {
+        await m.addColumn(vaultEntries, vaultEntries.requireMasterPassword);
       }
     },
   );

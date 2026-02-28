@@ -25,6 +25,7 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
 
   bool _busy = false;
   bool _obscure = true;
+  bool _requireMasterPassword = false;
 
   bool _checking = false;
   int? _pwnedCount;
@@ -114,6 +115,7 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
         url: url,
         pwnedCount: _pwnedCount,
         dek: dek,
+        requireMasterPassword: _requireMasterPassword,
       );
 
       if (!mounted) return;
@@ -193,6 +195,15 @@ class _VaultAddScreenState extends State<VaultAddScreen> {
                           icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
                         ),
                       ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    SwitchListTile(
+                      title: const Text('Requerir clave maestra para ver'),
+                      subtitle: const Text('Se pedirá la contraseña cada vez que intentes revelar esta entrada'),
+                      value: _requireMasterPassword,
+                      onChanged: (v) => setState(() => _requireMasterPassword = v),
                     ),
 
                     const SizedBox(height: 16),
