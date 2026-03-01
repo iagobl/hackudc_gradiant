@@ -21,15 +21,20 @@ Beyond storage, Kryptos addresses the root of security: the passwords themselves
 1. Ensure you have the [Flutter SDK](https://docs.flutter.dev/get-started/install) installed.
 2. Clone this repository.
 3. Run `flutter pub get` to fetch dependencies.
-4. Ensure the `liboqs` binaries are correctly linked for your target platform (Android arm64/x86_64).
-5. Run the app: `flutter run`
+4. Run `dart run build_runner build --delete-conflicting-outputs`.
+5. Ensure the `liboqs` binaries are correctly linked for your target platform (Android arm64/x86_64).
+6. Run the app: `flutter run`
 
 ## Usage Examples
-- **Creating a Vault**: Set a master password (minimum 12 characters, including uppercase, lowercase, numbers, and symbols). The app will check it against the RockYou breach list for your safety.
-- **Generating Passwords**: Use the generator tab to create keys up to 64 characters long, backed by multi-source entropy.
-- **Cloud Synchronization**: Log in with your Supabase account in Settings to enable real-time backup and multi-device sync.
-- **Adding Entries**: Tap the '+' button, fill in details, and toggle "Require Master Password" for extra-sensitive accounts.
-- **Revealing Passwords**: Tap the eye icon; if protected, it will request your master password or biometrics.
+- **Creating a vault**: Set a master password (minimum 12 characters, including uppercase, lowercase, numbers, and symbols). The app will check it against the RockYou breach list for your safety.
+- **Generating passwords**: Use the generator tab to create keys up to 64 characters long, backed by multi-source entropy.
+- **Cloud synchronization**: Log in with your Supabase account in Settings to enable real-time backup and multi-device sync.
+- **Adding entries**: Tap the '+' button, fill in details, and toggle "Require Master Password" for extra-sensitive accounts.
+- **Revealing passwords**: Tap the eye icon; if protected, it will request your master password or biometrics.
+- **Expoortiing a password vault**: Select the option in the settings page and save it wherever you want.
+- **Importing a password vault**: Select the option in the settings page and select the file to import.
+
+
 
 ## Configuration
 - **Auto-lock Timeout**: Configurable in Settings (Immediate, 30s, 1m, 5m, Never).
