@@ -13,10 +13,6 @@ First off, thank you for considering contributing to this project! It's people l
 - Use `flutter format .` before committing.
 - Ensure all new features are covered by tests.
 
-## Testing
-- Run all tests: `flutter test`.
-- Ensure your changes do not break existing functionality.
-
 ## Pull Request Process
 1. Fork the repo and create your branch from `main`.
 2. If you've added code that should be tested, add tests.
