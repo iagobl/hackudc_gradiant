@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hackudc_gradiant/features/generator/ui/generator_screen.dart';
+import '../features/generator/ui/generator_screen.dart';
 import '../features/settings/ui/settings_screen.dart';
 import '../features/vault/ui/vault_list_screen.dart';
 
