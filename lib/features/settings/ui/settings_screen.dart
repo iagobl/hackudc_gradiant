@@ -434,7 +434,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Cuenta creada.',
+                              'Cuenta creada, confirma el correo.',
                             ),
                           ),
                         );
@@ -596,7 +596,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(indent: 70),
               ListTile(
                 leading: Icon(_controller.cloudSignedIn ? Icons.logout_rounded : Icons.login_rounded),
-                title: Text(_controller.cloudSignedIn ? 'Cerrar sesión (Supabase)' : 'Iniciar sesión (Supabase)'),
+                title: Text(_controller.cloudSignedIn ? 'Cerrar sesión' : 'Iniciar sesión'),
                 subtitle: Text(_controller.cloudSignedIn
                     ? 'Cuenta: ${_controller.cloudUserEmail ?? ''}'
                     : 'Necesario para sincronizar e importar'),

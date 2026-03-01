@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/cloud/cloud_auth_service.dart';
 import '../../../core/cloud/cloud_sync_manager.dart';
@@ -24,8 +25,8 @@ class SettingsController extends ChangeNotifier {
   })  : _storage = storage ?? SecureStorageService(),
         _bootstrap = bootstrap ?? VaultBootstrapService(storage ?? SecureStorageService()),
         _repo = repo ?? VaultRepository(AppDatabase.instance),
-        _importExport = importExport ??
-            VaultImportExportService(repo ?? VaultRepository(AppDatabase.instance)),
+        _importExport =
+            importExport ?? VaultImportExportService(repo ?? VaultRepository(AppDatabase.instance)),
         _cloudSettings = cloudSettings ?? CloudSyncSettingsService(storage ?? SecureStorageService()),
         _cloudAuth = cloudAuth ?? const CloudAuthService(),
         _cloudSync = cloudSync ??
@@ -145,7 +146,11 @@ class SettingsController extends ChangeNotifier {
     required String email,
     required String password,
   }) async {
-    await _cloudAuth.signUpWithPassword(email: email, password: password);
+    await Supabase.instance.client.auth.signUp(
+      email: email,
+      password: password,
+      emailRedirectTo: 'kryptos://auth-callback',
+    );
     notifyListeners();
   }
 
