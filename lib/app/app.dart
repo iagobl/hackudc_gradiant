@@ -6,7 +6,6 @@ import '../features/auth/ui/lock_screen.dart';
 import '../features/auth/ui/setup_screen.dart';
 import 'home_shell.dart';
 
-// Llave global para permitir la navegación desde fuera del árbol de widgets
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class VaultApp extends StatelessWidget {
@@ -22,7 +21,6 @@ class VaultApp extends StatelessWidget {
         useMaterial3: true,
         colorSchemeSeed: Colors.blue,
       ),
-      // LifecycleWatcher envuelve a todo el Navigator
       builder: (context, child) => LifecycleWatcher(child: child!),
       home: const _BootDecider(),
     );
@@ -57,12 +55,10 @@ class _LifecycleWatcherState extends State<LifecycleWatcher> with WidgetsBinding
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     if (state == AppLifecycleState.paused) {
-      // Guardamos la hora exacta en que la app se minimiza
       _backgroundTime = DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
       if (_backgroundTime == null) return;
 
-      // Leemos la configuración de timeout guardada
       final timeoutStr = await _storage.readString('settings_auto_lock_seconds');
       final timeoutSeconds = int.tryParse(timeoutStr ?? '0') ?? 0;
 
@@ -72,12 +68,10 @@ class _LifecycleWatcherState extends State<LifecycleWatcher> with WidgetsBinding
       }
 
       final diff = DateTime.now().difference(_backgroundTime!).inSeconds;
-      
-      // Si el tiempo en segundo plano supera el límite y el vault está abierto
+
       if (diff >= timeoutSeconds && VaultState.instance != null) {
-        await _bootstrap.lockVault(); // Limpiar DEK de memoria
-        
-        // Redirigir a LockScreen limpiando todo el stack de navegación
+        await _bootstrap.lockVault();
+
         navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LockScreen()),
           (route) => false,

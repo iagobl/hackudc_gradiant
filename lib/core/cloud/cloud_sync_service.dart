@@ -72,18 +72,12 @@ class CloudSyncService {
 
     final entries = await _localRepo.listEntries();
 
-    // --- Sync de borrados ---
-    // Si una entry existía antes (teníamos mapping local->cloud) pero ya no está en la BD local,
-    // la borramos también en Supabase para mantener consistencia.
-    //
-    // Esto NO toca vuestra lógica local: solo mantiene el cloud espejo del estado local cuando cloud está ON.
     final localIds = entries.map((e) => e.id).toSet();
     final mapRaw = await _storage.readString('cloud_id_map_v1');
     final Map<String, dynamic> map = (mapRaw == null || mapRaw.isEmpty)
         ? <String, dynamic>{}
         : (jsonDecode(mapRaw) as Map<String, dynamic>);
 
-    // Copiamos keys porque vamos a modificar el map.
     final mappedLocalIds = List<String>.from(map.keys);
     bool mapChanged = false;
 
@@ -94,7 +88,6 @@ class CloudSyncService {
       if (!localIds.contains(localId)) {
         final cloudId = map[localIdStr]?.toString();
         if (cloudId != null && cloudId.isNotEmpty) {
-          // Borrar en Supabase.
           await _cloudRepo.deleteEntry(entryId: cloudId, userId: user.id);
         }
         map.remove(localIdStr);
@@ -106,7 +99,6 @@ class CloudSyncService {
       await _storage.writeString('cloud_id_map_v1', jsonEncode(map));
     }
 
-    // --- Sync normal de upsert (lo que ya tenías) ---
     for (final e in entries) {
       final existing = await _idMap.getCloudIdForLocal(e.id);
       final cloudId = existing ?? uuidV4();
@@ -309,7 +301,6 @@ class CloudSyncService {
     final breached = (data['breached'] as bool?) ?? false;
 
     if (localId == null) {
-      // Insert
       final insertedId = await _db.into(_db.vaultEntries).insert(
         VaultEntriesCompanion.insert(
           title: title,

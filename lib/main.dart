@@ -13,8 +13,6 @@ Future<void> main() async {
     anonKey: SupabaseConfig.anonKey,
   );
 
-  // Arranca el listener de sync automático (si el usuario activa cloud).
-  // No rompe nada si no hay sesión o el vault está bloqueado.
   await CloudSyncManager.instance.start();
 
   runApp(const VaultApp());
