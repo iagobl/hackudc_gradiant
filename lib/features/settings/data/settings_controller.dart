@@ -125,10 +125,12 @@ class SettingsController extends ChangeNotifier {
   Future<void> changeMasterPassword({
     required String oldPassword,
     required String newPassword,
+    String? hint,
   }) async {
     await _bootstrap.changeMasterPassword(
       oldPassword: oldPassword,
       newPassword: newPassword,
+      hint: hint,
     );
   }
 

@@ -179,155 +179,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _changeMasterPassword() async {
-    final oldController = TextEditingController();
-    final newController = TextEditingController();
-    final confirmController = TextEditingController();
-
-    final result = await showDialog<bool>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) {
-        String? oldError;
-        String? newError;
-        String? confirmError;
-        String? generalError;
-
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text(
-                'Cambiar Clave Maestra',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-              contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-              actionsPadding: const EdgeInsets.fromLTRB(0, 0, 16, 8),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (generalError != null)
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                generalError!,
-                                style: const TextStyle(color: Colors.red, fontSize: 13),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    const Text(
-                      'Se requiere al menos 12 caracteres, mayúsculas y símbolos.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: oldController,
-                      obscureText: true,
-                      onChanged: (_) => setDialogState(() => oldError = null),
-                      decoration: InputDecoration(
-                        labelText: 'Contraseña actual',
-                        labelStyle: const TextStyle(fontSize: 14),
-                        errorText: oldError,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: newController,
-                      obscureText: true,
-                      onChanged: (_) => setDialogState(() => newError = null),
-                      decoration: InputDecoration(
-                        labelText: 'Nueva contraseña',
-                        labelStyle: const TextStyle(fontSize: 14),
-                        errorText: newError,
-                        errorMaxLines: 3,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: confirmController,
-                      obscureText: true,
-                      onChanged: (_) => setDialogState(() => confirmError = null),
-                      decoration: InputDecoration(
-                        labelText: 'Confirmar contraseña',
-                        labelStyle: const TextStyle(fontSize: 14),
-                        errorText: confirmError,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    bool isValid = true;
-                    setDialogState(() {
-                      oldError = null;
-                      newError = null;
-                      confirmError = null;
-                      generalError = null;
-
-                      final newPass = newController.text;
-
-                      if (oldController.text.isEmpty) {
-                        oldError = 'Introduce tu contraseña actual';
-                        isValid = false;
-                      }
-
-                      if (newPass.isEmpty) {
-                        newError = 'La contraseña no puede estar vacía';
-                        isValid = false;
-                      } else {
-                        final hasUppercase = newPass.contains(RegExp(r'[A-Z]'));
-                        final hasSpecial = newPass.contains(RegExp(r'[^a-zA-Z0-9]'));
-
-                        if (newPass.length < 12 || !hasUppercase || !hasSpecial) {
-                          newError =
-                          'Debe tener al menos 12 caracteres, contener caracteres especiales y mayúsculas';
-                          isValid = false;
-                        }
-                      }
-
-                      if (newPass != confirmController.text) {
-                        confirmError = 'Las contraseñas no coinciden';
-                        isValid = false;
-                      }
-                    });
-
-                    if (isValid) Navigator.pop(context, true);
-                  },
-                  child: const Text('Actualizar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => const _ChangePasswordDialog(),
     );
 
-    if (result == true) {
+    if (result != null) {
       try {
         await _controller.changeMasterPassword(
-          oldPassword: oldController.text,
-          newPassword: newController.text,
+          oldPassword: result['old']!,
+          newPassword: result['new']!,
+          hint: result['hint'],
         );
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -653,6 +515,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final cs = theme.colorScheme;
 
     return Scaffold(
+      backgroundColor: cs.surface,
       appBar: AppBar(
         backgroundColor: cs.surface,
         surfaceTintColor: cs.surface,
@@ -742,7 +605,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(indent: 70),
               ListTile(
                 leading: const Icon(Icons.sync_rounded),
-                title: const Text('Sincronizar ahora'),
+                title: const Text('Sincronización ahora'),
                 subtitle: const Text('Sube las contraseñas locales al cloud'),
                 enabled: _controller.cloudEnabled && _controller.cloudSignedIn,
                 onTap: _syncNow,
@@ -771,6 +634,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog();
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _old = TextEditingController();
+  final _new = TextEditingController();
+  final _confirm = TextEditingController();
+  final _hint = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _old.dispose(); _new.dispose(); _confirm.dispose(); _hint.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Cambiar Clave Maestra', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+      titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+      actionsPadding: const EdgeInsets.fromLTRB(0, 0, 16, 8),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_error != null)
+              Container(
+                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
+                child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ),
+            const Text('Se requiere al menos 12 caracteres, mayúsculas y símbolos.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 16),
+            TextField(controller: _old, obscureText: true, decoration: const InputDecoration(labelText: 'Contraseña actual', border: OutlineInputBorder())),
+            const SizedBox(height: 16),
+            TextField(controller: _new, obscureText: true, decoration: const InputDecoration(labelText: 'Nueva contraseña', border: OutlineInputBorder(), errorMaxLines: 3)),
+            const SizedBox(height: 16),
+            TextField(controller: _confirm, obscureText: true, decoration: const InputDecoration(labelText: 'Confirmar contraseña', border: OutlineInputBorder())),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _hint,
+              decoration: const InputDecoration(
+                labelText: 'Nueva pista (opcional)',
+                helperText: 'Ayuda visual para recordar tu clave.',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: () {
+            final pass = _new.text;
+            if (pass != _confirm.text) { setState(() => _error = 'Las contraseñas no coinciden'); return; }
+            final hasUppercase = pass.contains(RegExp(r'[A-Z]'));
+            final hasSpecial = pass.contains(RegExp(r'[^a-zA-Z0-9]'));
+            if (pass.length < 12 || !hasUppercase || !hasSpecial) {
+              setState(() => _error = 'Debe tener al menos 12 caracteres, mayúsculas y símbolos');
+              return;
+            }
+            Navigator.pop(context, {'old': _old.text, 'new': pass, 'hint': _hint.text.trim()});
+          },
+          child: const Text('Actualizar'),
+        ),
+      ],
     );
   }
 }

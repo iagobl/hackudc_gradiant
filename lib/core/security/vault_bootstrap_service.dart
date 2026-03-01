@@ -25,6 +25,7 @@ class VaultBootstrapService {
   static const _kPublicKey = 'vault_publicKey_b64';
   static const _kBioVaultKey = 'bio_vault_key_b64';
   static const _kBioEnabled = 'vault_bio_enabled';
+  static const _kHint = 'vault_hint';
 
   static const _verifierSecret = 'VAULT_VERIFIER_TOKEN';
 
@@ -89,6 +90,7 @@ class VaultBootstrapService {
   Future<void> changeMasterPassword({
     required String oldPassword,
     required String newPassword,
+    String? hint,
   }) async {
     await unlockVault(masterPassword: oldPassword);
     
@@ -120,13 +122,19 @@ class VaultBootstrapService {
     await _storage.writeString(_kCiphertextKEM, base64Encode(pqcResult['ciphertextKEM']!));
     await _storage.writeString(_kPrivateKey, base64Encode(pqcResult['privateKey']!));
     await _storage.writeString(_kPublicKey, base64Encode(pqcResult['publicKey']!));
+    
+    if (hint != null) {
+      await _storage.writeString(_kHint, hint);
+    } else {
+      await _storage.delete(_kHint);
+    }
 
     if (await isBiometricsEnabled()) {
       await enableBiometrics();
     }
   }
 
-  Future<void> createVault({required String masterPassword}) async {
+  Future<void> createVault({required String masterPassword, String? hint}) async {
     final salt = Uint8List.fromList(List.generate(16, (_) => Random.secure().nextInt(256)));
     final kek = await _kdf.deriveKEK(masterPassword: masterPassword, salt: salt);
     final dek = await _crypto.generateDEK();
@@ -152,6 +160,10 @@ class VaultBootstrapService {
     await _storage.writeString(_kCiphertextKEM, base64Encode(pqcResult['ciphertextKEM']!));
     await _storage.writeString(_kPrivateKey, base64Encode(pqcResult['privateKey']!));
     await _storage.writeString(_kPublicKey, base64Encode(pqcResult['publicKey']!));
+
+    if (hint != null && hint.isNotEmpty) {
+      await _storage.writeString(_kHint, hint);
+    }
 
     VaultState.set(dek);
   }
@@ -212,5 +224,9 @@ class VaultBootstrapService {
     final verifier = await _storage.readString(_kVerifier);
     final cipherDEK = await _storage.readString(_kCipherDEK);
     return salt != null && verifier != null && cipherDEK != null;
+  }
+
+  Future<String?> getHint() async {
+    return await _storage.readString(_kHint);
   }
 }

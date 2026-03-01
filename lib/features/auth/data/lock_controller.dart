@@ -25,8 +25,7 @@ class LockController extends ChangeNotifier {
     _setBusy(true);
 
     try {
-      final service = VaultBootstrapService(SecureStorageService());
-      await service.unlockVaultWithBiometrics();
+      await _service.unlockVaultWithBiometrics();
       return true;
     } on StateError catch (e) {
       _error =
@@ -59,5 +58,9 @@ class LockController extends ChangeNotifier {
     } finally {
       _setBusy(false);
     }
+  }
+
+  Future<String?> getHint() async {
+    return await _service.getHint();
   }
 }

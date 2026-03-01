@@ -70,6 +70,16 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 
+  Future<void> _showHint() async {
+    final hint = await _c.getHint();
+    if (!mounted) return;
+    
+    await _showCenterMessage(
+      title: 'Pista de recuperación',
+      message: hint ?? 'No configuraste ninguna pista para este vault.',
+    );
+  }
+
   @override
   void dispose() {
     _c.removeListener(_onChanged);
@@ -298,7 +308,7 @@ class _LockScreenState extends State<LockScreen> {
                             const SizedBox(height: 10),
                             if (_c.error != null)
                               Padding(
-                                padding: const EdgeInsets.only(top: 2),
+                                padding: const EdgeInsets.only(top: 2, bottom: 8),
                                 child: Text(
                                   _c.error!,
                                   style: TextStyle(
@@ -307,6 +317,19 @@ class _LockScreenState extends State<LockScreen> {
                                   ),
                                 ),
                               ),
+                            
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: _c.busy ? null : _showHint,
+                                icon: const Icon(Icons.help_outline_rounded, size: 18),
+                                label: const Text('¿Has olvidado tu clave?'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: cs.onSurfaceVariant,
+                                  textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),

@@ -41,6 +41,7 @@ class SetupController extends ChangeNotifier {
   Future<bool> createVault({
     required String password1,
     required String password2,
+    String? hint,
   }) async {
     _error = null;
     _setBusy(true);
@@ -65,7 +66,7 @@ class SetupController extends ChangeNotifier {
         );
       }
 
-      await _service.createVault(masterPassword: a);
+      await _service.createVault(masterPassword: a, hint: hint);
 
       try {
         final available = await _service.isBiometricsAvailable();

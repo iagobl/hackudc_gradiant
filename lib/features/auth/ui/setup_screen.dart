@@ -14,6 +14,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
   final _pw1 = TextEditingController();
   final _pw2 = TextEditingController();
+  final _hint = TextEditingController();
 
   late final SetupController _c;
 
@@ -28,30 +29,11 @@ class _SetupScreenState extends State<SetupScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _showCenterMessage({
-    required String title,
-    required String message,
-  }) async {
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _create() async {
     final ok = await _c.createVault(
       password1: _pw1.text,
       password2: _pw2.text,
+      hint: _hint.text.trim().isEmpty ? null : _hint.text.trim(),
     );
 
     if (!ok) return;
@@ -68,6 +50,7 @@ class _SetupScreenState extends State<SetupScreen> {
     _c.dispose();
     _pw1.dispose();
     _pw2.dispose();
+    _hint.dispose();
     super.dispose();
   }
 
@@ -232,12 +215,23 @@ class _SetupScreenState extends State<SetupScreen> {
                             TextField(
                               controller: _pw2,
                               obscureText: true,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _c.busy ? null : _create(),
+                              textInputAction: TextInputAction.next,
                               decoration: _fieldDecoration(
                                 context,
                                 label: 'Repetir clave maestra',
                                 suffix: const Icon(Icons.check_rounded),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _hint,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _c.busy ? null : _create(),
+                              decoration: _fieldDecoration(
+                                context,
+                                label: 'Pista de contraseña (opcional)',
+                                helper: 'Algo que te ayude a recordarla si la olvidas.',
+                                suffix: const Icon(Icons.help_outline_rounded),
                               ),
                             ),
                             const SizedBox(height: 12),
