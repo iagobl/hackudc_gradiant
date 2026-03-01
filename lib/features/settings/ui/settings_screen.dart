@@ -650,9 +650,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: cs.surface,
+        surfaceTintColor: cs.surface,
         title: Text(
           'Configuración',
           style: theme.textTheme.headlineSmall?.copyWith(

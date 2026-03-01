@@ -16,7 +16,7 @@ class VaultApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'HackUDC Vault',
+      title: 'Kryptos',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

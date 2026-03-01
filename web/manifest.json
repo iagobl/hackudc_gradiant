@@ -1,0 +1,24 @@
+{
+    "name": "Gradiant Vault Extension",
+    "description": "Autocompletado seguro con PQC",
+    "version": "1.0.0",
+    "manifest_version": 3,
+    "action": {
+        "default_popup": "index.html",
+        "default_icon": "assets/icon/icon.png"
+    },
+    "icons": {
+        "128": "assets/icon/icon.png"
+    },
+    "permissions": [
+        "tabs",
+        "activeTab",
+        "storage"
+    ],
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["autofill_script.js"]
+        }
+    ]
+}

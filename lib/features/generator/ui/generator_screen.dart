@@ -47,10 +47,10 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
     final cs = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cs.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
+        backgroundColor: cs.surface,
+        surfaceTintColor: cs.surface,
         elevation: 0,
         title: const Text(
           'Generar contraseña',
