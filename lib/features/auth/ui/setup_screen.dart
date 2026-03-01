@@ -222,7 +222,12 @@ class _SetupScreenState extends State<SetupScreen> {
                                 suffix: const Icon(Icons.check_rounded),
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 10),
+                              child: Divider(thickness: 1),
+                            ),
+
                             TextField(
                               controller: _hint,
                               textInputAction: TextInputAction.done,

@@ -126,16 +126,11 @@ class SettingsController extends ChangeNotifier {
     required String oldPassword,
     required String newPassword,
     String? hint,
-  }) async {
-    await _bootstrap.changeMasterPassword(
+  }) async {    await _bootstrap.changeMasterPassword(
       oldPassword: oldPassword,
       newPassword: newPassword,
       hint: hint,
     );
-
-    if (_cloudEnabled && _cloudAuth.isSignedIn) {
-      await _cloudSync.bootstrapCloud(masterPassword: newPassword);
-    }
   }
 
   Future<void> signInCloud({
