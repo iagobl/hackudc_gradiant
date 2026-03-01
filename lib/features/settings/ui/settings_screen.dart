@@ -558,6 +558,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               const Divider(indent: 70),
+              SwitchListTile(
+                secondary: const Icon(Icons.screenshot_rounded),
+                title: const Text('Bloquear capturas de pantalla'),
+                subtitle: const Text(
+                  'Evita capturas y previsualización en el menú de recientes',
+                ),
+                value: _controller.screenshotProtectionEnabled,
+                onChanged: (v) async {
+                  try {
+                    await _controller.toggleScreenshotProtection(v);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          v
+                              ? 'Capturas bloqueadas.'
+                              : 'Capturas permitidas.',
+                        ),
+                      ),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: ${e.toString()}')),
+                    );
+                  }
+                },
+              ),
+              const Divider(indent: 70),
               ListTile(
                 leading: const Icon(Icons.timer_outlined),
                 title: const Text('Tiempo de Bloqueo Automático'),

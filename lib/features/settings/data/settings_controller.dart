@@ -8,6 +8,7 @@ import '../../../core/cloud/cloud_sync_manager.dart';
 import '../../../core/cloud/cloud_sync_service.dart';
 import '../../../core/cloud/cloud_sync_settings_service.dart';
 import '../../../core/security/vault_bootstrap_service.dart';
+import '../../../core/security/screenshot_protection_service.dart';
 import '../../../core/storage/app_database.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../vault/data/vault_repository.dart';
@@ -22,6 +23,7 @@ class SettingsController extends ChangeNotifier {
     CloudSyncSettingsService? cloudSettings,
     CloudAuthService? cloudAuth,
     CloudSyncService? cloudSync,
+    ScreenshotProtectionService? screenshotProtection,
   })  : _storage = storage ?? SecureStorageService(),
         _bootstrap = bootstrap ?? VaultBootstrapService(storage ?? SecureStorageService()),
         _repo = repo ?? VaultRepository(AppDatabase.instance),
@@ -35,7 +37,8 @@ class SettingsController extends ChangeNotifier {
               localRepo: repo ?? VaultRepository(AppDatabase.instance),
               db: AppDatabase.instance,
               storage: storage ?? SecureStorageService(),
-            );
+            ),
+        _screenshotProtection = screenshotProtection ?? ScreenshotProtectionService();
 
   final VaultBootstrapService _bootstrap;
   final SecureStorageService _storage;
@@ -45,18 +48,22 @@ class SettingsController extends ChangeNotifier {
   final CloudSyncSettingsService _cloudSettings;
   final CloudAuthService _cloudAuth;
   final CloudSyncService _cloudSync;
+  final ScreenshotProtectionService _screenshotProtection;
 
   static const String kAutoLockKey = 'settings_auto_lock_seconds';
+  static const String kScreenshotProtectionKey = 'settings_screenshot_protection_enabled';
 
   bool _biometricsEnabled = false;
   bool _loading = true;
   int _autoLockSeconds = 30;
+  bool _screenshotProtectionEnabled = true;
 
   bool _cloudEnabled = false;
 
   bool get biometricsEnabled => _biometricsEnabled;
   bool get loading => _loading;
   int get autoLockSeconds => _autoLockSeconds;
+  bool get screenshotProtectionEnabled => _screenshotProtectionEnabled;
 
   bool get cloudEnabled => _cloudEnabled;
   bool get cloudSignedIn => _cloudAuth.isSignedIn;
@@ -73,14 +80,30 @@ class SettingsController extends ChangeNotifier {
       final lockStr = await _storage.readString(kAutoLockKey);
       final lockVal = int.tryParse(lockStr ?? '30') ?? 30;
 
+      final spStr = await _storage.readString(kScreenshotProtectionKey);
+      final spVal = (spStr == null) ? true : spStr == 'true';
+
       final cloudEnabled = await _cloudSettings.isEnabled();
 
       _biometricsEnabled = bioEnabled;
       _autoLockSeconds = lockVal;
+      _screenshotProtectionEnabled = spVal;
       _cloudEnabled = cloudEnabled;
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> toggleScreenshotProtection(bool value) async {
+    _setLoading(true);
+    try {
+      await _storage.writeString(kScreenshotProtectionKey, value.toString());
+      _screenshotProtectionEnabled = value;
+      await _screenshotProtection.setEnabled(value);
+      notifyListeners();
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -128,10 +151,10 @@ class SettingsController extends ChangeNotifier {
     required String newPassword,
     String? hint,
   }) async {    await _bootstrap.changeMasterPassword(
-      oldPassword: oldPassword,
-      newPassword: newPassword,
-      hint: hint,
-    );
+    oldPassword: oldPassword,
+    newPassword: newPassword,
+    hint: hint,
+  );
   }
 
   Future<void> signInCloud({
